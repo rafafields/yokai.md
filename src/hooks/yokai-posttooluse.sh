@@ -3,7 +3,7 @@
 # failures, categorizes them, and updates the counters. Registered on
 # both events because which one delivers Bash failures varies by Claude
 # Code version (section 4) — the script tells them apart by
-# hook_event_name.
+# hook_event_name, and counts each tool_use_id once.
 set -euo pipefail
 # Directory of this script, whether invoked with / or \ separators.
 HOOK_DIR="${0%[/\\]*}"; [ "$HOOK_DIR" = "$0" ] && HOOK_DIR=.
@@ -39,6 +39,10 @@ else
   json_raw tool_response || true
   TEXT="$TEXT $JSON_RAW"
 fi
+
+yokai_lock || exit 0
+# The same failure can arrive through both events on some versions.
+if json_str tool_use_id && yokai_seen "$JSON_STR"; then exit 0; fi
 
 config_load || exit 0
 yokai_now

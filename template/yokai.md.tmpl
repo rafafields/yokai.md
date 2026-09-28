@@ -69,6 +69,8 @@ project/
       config.json                   # born with /yokai summon — birth, life, hunger, streak, categories, emoji, name
       statusline_msg.txt            # temporary message (with expiry) after a one-liner fires — self-cleans
       farewell.txt                  # queued goodbye when the yokai leaves mid-session — delivered once, then deleted
+      seen_ids                      # last 50 counted tool_use_ids — so no failure counts twice
+      .lock/                        # held while a hook updates config.json — gone when it exits
 ```
 
 ---
@@ -116,7 +118,10 @@ necessary because which event actually delivers a command's failure varies
 by Claude Code version: in some, `PostToolUse` covers both success and
 failure; in others, failures go exclusively to `PostToolUseFailure` and
 `PostToolUse` only sees successes. The script tells them apart by
-`hook_event_name` and never counts the same failure twice.
+`hook_event_name`, and remembers the last 50 `tool_use_id`s it counted,
+so a failure delivered through both events counts once. Hooks that
+update `config.json` take a lock first, so failures from parallel Bash
+calls don't overwrite each other's counts.
 
 Categorization compares, case-insensitively and as plain text (never as
 regex), the command + its output against the keywords in `errors.txt`,

@@ -35,6 +35,10 @@ if [ "$SUB" = help ]; then
   exit 0
 fi
 
+# Everything below reads or writes config.json.
+[ -d "$YOKAI_DIR" ] || exit 0
+yokai_lock || exit 0
+
 if [ "$SUB" = summon ]; then
   if [ -f "$CONFIG" ]; then
     yokai_say "YOKAI" "there is already a yokai counting failures in this project."

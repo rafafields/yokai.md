@@ -16,7 +16,7 @@ yokai_now
 # Leftover from v7, which kept the one-liner in a .json file.
 rm -f "$YOKAI_DIR/statusline_msg.json"
 
-if [ -f "$CONFIG" ] && config_load; then
+if [ -f "$CONFIG" ] && yokai_lock && config_load; then
   rc=0
   yokai_rollover || rc=$?
   if [ "$rc" -eq 0 ]; then config_save; fi

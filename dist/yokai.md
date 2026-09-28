@@ -69,6 +69,8 @@ project/
       config.json                   # born with /yokai summon — birth, life, hunger, streak, categories, emoji, name
       statusline_msg.txt            # temporary message (with expiry) after a one-liner fires — self-cleans
       farewell.txt                  # queued goodbye when the yokai leaves mid-session — delivered once, then deleted
+      seen_ids                      # last 50 counted tool_use_ids — so no failure counts twice
+      .lock/                        # held while a hook updates config.json — gone when it exits
 ```
 
 ---
@@ -116,7 +118,10 @@ necessary because which event actually delivers a command's failure varies
 by Claude Code version: in some, `PostToolUse` covers both success and
 failure; in others, failures go exclusively to `PostToolUseFailure` and
 `PostToolUse` only sees successes. The script tells them apart by
-`hook_event_name` and never counts the same failure twice.
+`hook_event_name`, and remembers the last 50 `tool_use_id`s it counted,
+so a failure delivered through both events counts once. Hooks that
+update `config.json` take a lock first, so failures from parallel Bash
+calls don't overwrite each other's counts.
 
 Categorization compares, case-insensitively and as plain text (never as
 regex), the command + its output against the keywords in `errors.txt`,
@@ -194,7 +199,7 @@ yokai_now
 # Leftover from v7, which kept the one-liner in a .json file.
 rm -f "$YOKAI_DIR/statusline_msg.json"
 
-if [ -f "$CONFIG" ] && config_load; then
+if [ -f "$CONFIG" ] && yokai_lock && config_load; then
   rc=0
   yokai_rollover || rc=$?
   if [ "$rc" -eq 0 ]; then config_save; fi
@@ -241,6 +246,10 @@ if [ "$SUB" = help ]; then
   yokai_say "YOKAI COMMANDS" "/yokai summon — birth a new yokai in this project. /yokai forget — erase the current yokai and its counters. /yokai report — a sarcastic breakdown of failures by category. /yokai help — this list."
   exit 0
 fi
+
+# Everything below reads or writes config.json.
+[ -d "$YOKAI_DIR" ] || exit 0
+yokai_lock || exit 0
 
 if [ "$SUB" = summon ]; then
   if [ -f "$CONFIG" ]; then
@@ -365,7 +374,7 @@ yokai_say "YOKAI REPORT" "$NAME here · total failures: $LIFE · main headache: 
 # failures, categorizes them, and updates the counters. Registered on
 # both events because which one delivers Bash failures varies by Claude
 # Code version (section 4) — the script tells them apart by
-# hook_event_name.
+# hook_event_name, and counts each tool_use_id once.
 set -euo pipefail
 # Directory of this script, whether invoked with / or \ separators.
 HOOK_DIR="${0%[/\\]*}"; [ "$HOOK_DIR" = "$0" ] && HOOK_DIR=.
@@ -401,6 +410,10 @@ else
   json_raw tool_response || true
   TEXT="$TEXT $JSON_RAW"
 fi
+
+yokai_lock || exit 0
+# The same failure can arrive through both events on some versions.
+if json_str tool_use_id && yokai_seen "$JSON_STR"; then exit 0; fi
 
 config_load || exit 0
 yokai_now
@@ -662,6 +675,56 @@ yokai_farewell() {
   IFS= read -r msg < "$f" || true
   rm -f "$f"
   yokai_say "YOKAI FAREWELL" "${msg:-$YOKAI_FAREWELL_TEXT}"
+}
+
+# yokai_lock: serializes config.json read-modify-write between hooks.
+# Claude Code runs matching hooks in parallel and the agent often runs
+# several Bash calls at once, so two failure hooks can overlap. mkdir is
+# atomic everywhere, Git Bash included. A lock older than the 10 s hook
+# timeout belongs to a killed hook and is taken over. Released on exit.
+# Returns 1 if it can't get the lock within ~6 s.
+yokai_lock() {
+  YOKAI_LOCK="$YOKAI_DIR/.lock"
+  local tries=0 ts
+  while ! mkdir "$YOKAI_LOCK" 2>/dev/null; do
+    tries=$((tries + 1))
+    if [ $((tries % 20)) -eq 0 ]; then
+      ts=""
+      IFS= read -r ts < "$YOKAI_LOCK/ts" 2>/dev/null || true
+      yokai_now
+      # No timestamp yet is normal for a moment (mkdir, then write);
+      # for seconds it means the holder died in between.
+      if { [[ $ts =~ ^[0-9]+$ ]] && [ $((NOW - ts)) -gt 10 ]; } ||
+         { [ -z "$ts" ] && [ "$tries" -ge 60 ]; }; then
+        rm -rf "$YOKAI_LOCK"
+        continue
+      fi
+    fi
+    [ "$tries" -lt 120 ] || return 1
+    sleep 0.05
+  done
+  trap 'rm -rf "$YOKAI_LOCK"' EXIT
+  yokai_now
+  printf '%s\n' "$NOW" > "$YOKAI_LOCK/ts"
+}
+
+# yokai_seen ID: returns 0 if this tool_use_id was already counted;
+# otherwise records it (keeping the last 50) and returns 1. Guards
+# against a failure arriving through both PostToolUse and
+# PostToolUseFailure. Call it holding yokai_lock.
+yokai_seen() {
+  local f="$YOKAI_DIR/seen_ids" l keep=() start
+  [ -n "$1" ] || return 1
+  if [ -f "$f" ]; then
+    while IFS= read -r l || [ -n "$l" ]; do
+      [ "$l" = "$1" ] && return 0
+      keep+=("$l")
+    done < "$f"
+  fi
+  keep+=("$1")
+  start=$((${#keep[@]} > 50 ? ${#keep[@]} - 50 : 0))
+  printf '%s\n' "${keep[@]:start}" > "$f.tmp.$$" && mv -f "$f.tmp.$$" "$f"
+  return 1
 }
 
 # catalog_lines FILE: loads non-empty, non-comment (#) lines into LINES.

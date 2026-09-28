@@ -61,7 +61,7 @@ load test_helper
 
 @test "PostToolUse counts success: false" {
   summon
-  fixture posttooluse-bash "COMMAND=x" "STDOUT=" "STDERR=" "EXIT=0" "CWD=$PROJECT" \
+  fixture posttooluse-bash "COMMAND=x" "STDOUT=" "STDERR=" "EXIT=0" "CWD=$PROJECT" "TOOLID=t9" \
     | sed 's/"interrupted":false/"success":false/' | hook posttooluse
   [ "$(cfg life)" = 1 ]
 }
@@ -168,6 +168,44 @@ EOF
   bash_failure 'x' 'y'
   [ -f "$YOKAI/statusline_msg.txt" ]
   in_file "$(sed -n 2p "$YOKAI/statusline_msg.txt")" "$YOKAI/phrases.txt"
+}
+
+@test "a failure delivered by both events counts once (Y-08)" {
+  summon
+  TOOLID=toolu_same bash_failure 'npm test' 'tests failed'
+  TOOLID=toolu_same bash_result 'npm test' '' 'tests failed' 1
+  [ "$(cfg life)" = 1 ]
+  TOOLID=toolu_other bash_failure 'npm test' 'tests failed'
+  [ "$(cfg life)" = 2 ]
+}
+
+@test "remembers only the last 50 tool_use_ids" {
+  summon
+  for i in $(seq 1 60); do echo "toolu_old$i"; done > "$YOKAI/seen_ids"
+  TOOLID=toolu_new bash_failure 'x' 'y'
+  [ "$(wc -l < "$YOKAI/seen_ids" | tr -d ' ')" = 50 ]
+  [ "$(tail -1 "$YOKAI/seen_ids")" = toolu_new ]
+}
+
+@test "parallel failures don't lose counts (Y-09)" {
+  summon
+  for i in $(seq 1 12); do
+    bash_failure 'git push' 'Updates were rejected' &
+  done
+  wait
+  [ "$(cfg life)" = 12 ]
+  [ "$(cfg hunger_today)" = 12 ]
+  [ ! -d "$YOKAI/.lock" ]
+  assert_valid_json "$CONFIG"
+}
+
+@test "a stale lock left by a killed hook is taken over" {
+  summon
+  mkdir "$YOKAI/.lock"
+  echo 1000 > "$YOKAI/.lock/ts"
+  bash_failure 'x' 'y'
+  [ "$(cfg life)" = 1 ]
+  [ ! -d "$YOKAI/.lock" ]
 }
 
 @test "300 KB of output is categorized well within the 10 s hook timeout" {

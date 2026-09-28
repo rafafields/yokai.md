@@ -46,12 +46,12 @@ prompt() {
 
 # bash_failure COMMAND ERROR [CWD]: a PostToolUseFailure for Bash.
 bash_failure() {
-  fixture posttoolusefailure-bash "COMMAND=$1" "ERROR=$2" "CWD=${3:-$PROJECT}" | hook posttooluse
+  fixture posttoolusefailure-bash "COMMAND=$1" "ERROR=$2" "CWD=${3:-$PROJECT}" "TOOLID=${TOOLID:-$(new_tool_id)}" | hook posttooluse
 }
 
 # bash_result COMMAND STDOUT STDERR EXIT_CODE: a PostToolUse for Bash.
 bash_result() {
-  fixture posttooluse-bash "COMMAND=$1" "STDOUT=$2" "STDERR=$3" "EXIT=$4" "CWD=$PROJECT" | hook posttooluse
+  fixture posttooluse-bash "COMMAND=$1" "STDOUT=$2" "STDERR=$3" "EXIT=$4" "CWD=$PROJECT" "TOOLID=${TOOLID:-$(new_tool_id)}" | hook posttooluse
 }
 
 statusline() {
@@ -113,4 +113,10 @@ in_file() {
 # days_ago N: the date N days before today, YYYY-MM-DD (GNU or BSD date).
 days_ago() {
   date -d "$1 days ago" +%Y-%m-%d 2>/dev/null || date -v "-$1d" +%Y-%m-%d
+}
+
+# new_tool_id: a fresh tool_use_id, so repeated calls aren't deduplicated.
+# Set TOOLID to send the same one twice.
+new_tool_id() {
+  printf 'toolu_%s%s%s' "$RANDOM" "$RANDOM" "$RANDOM"
 }
