@@ -1,0 +1,50 @@
+{
+  "_usage": "Name catalog for /yokai summon (section 2). 'words' pairs a romanized Japanese word with its meaning, 'suffixes' are real yokai-archetype endings, 'famous' are real yokai names used verbatim as an occasional easter egg. Combination logic (15% famous / 35% 'X no Y' / 50% 'X-suffix') lives in yokai-userprompt.sh, not here — this file is pure data.",
+  "words": [
+    { "jp": "Yami", "es": "darkness" },
+    { "jp": "Tsuki", "es": "moon" },
+    { "jp": "Kage", "es": "shadow" },
+    { "jp": "Hi", "es": "fire" },
+    { "jp": "Mizu", "es": "water" },
+    { "jp": "Kaze", "es": "wind" },
+    { "jp": "Ame", "es": "rain" },
+    { "jp": "Yuki", "es": "snow" },
+    { "jp": "Tsuchi", "es": "earth" },
+    { "jp": "Kuro", "es": "black" },
+    { "jp": "Shiro", "es": "white" },
+    { "jp": "Aka", "es": "red" },
+    { "jp": "Yoru", "es": "night" },
+    { "jp": "Nemuri", "es": "sleep" },
+    { "jp": "Kiri", "es": "fog" },
+    { "jp": "Kane", "es": "bell" },
+    { "jp": "Ito", "es": "thread" },
+    { "jp": "Hone", "es": "bone" },
+    { "jp": "Namida", "es": "tear" },
+    { "jp": "Warai", "es": "laughter" },
+    { "jp": "Sake", "es": "rice wine" },
+    { "jp": "Bug", "es": "terminal failure, obviously" }
+  ],
+  "suffixes": [
+    { "jp": "onna", "es": "spirit woman" },
+    { "jp": "otoko", "es": "spirit man" },
+    { "jp": "kozo", "es": "child monk" },
+    { "jp": "bozu", "es": "monk" },
+    { "jp": "baba", "es": "old woman" },
+    { "jp": "jijii", "es": "old man" },
+    { "jp": "warashi", "es": "child spirit" },
+    { "jp": "nyudo", "es": "giant monk" },
+    { "jp": "gami", "es": "minor deity" },
+    { "jp": "oni", "es": "demon/ogre" },
+    { "jp": "kitsune", "es": "fox spirit" },
+    { "jp": "neko", "es": "cat spirit" },
+    { "jp": "karasu", "es": "crow" },
+    { "jp": "kumo", "es": "spider" },
+    { "jp": "bi", "es": "ghost fire" }
+  ],
+  "famous": [
+    "Kappa", "Tengu", "Nurarihyon", "Rokurokubi", "Nue", "Jorogumo",
+    "Yuki-onna", "Konaki-jijii", "Akaname", "Tsuchigumo", "Bakeneko",
+    "Nekomata", "Kasa-obake", "Chochin-obake", "Hyakume", "Amanojaku",
+    "Kamaitachi", "Shirime", "Zashiki-warashi", "Tofu-kozo"
+  ]
+}

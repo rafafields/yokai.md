@@ -1,0 +1,35 @@
+{
+  "_usage": "Error category catalog. 'keywords' are substrings (case-insensitive, plain text — never regex) searched for in the command + stdout/stderr of the failed attempt. Keys starting with '_' (like this one) are ignored as categories. v1, keyword-based — expect to tune it with real usage.",
+  "git": {
+    "name": "Git",
+    "keywords": ["git ", "merge conflict", "detached HEAD", "rejected", "non-fast-forward", "fatal:"]
+  },
+  "dependencies": {
+    "name": "Dependencies",
+    "keywords": ["npm ERR", "ERESOLVE", "pip install", "No matching distribution", "yarn error", "cargo:", "Could not find a version"]
+  },
+  "permissions": {
+    "name": "Permissions",
+    "keywords": ["Permission denied", "EACCES", "Operation not permitted", "read-only file system"]
+  },
+  "network": {
+    "name": "Network",
+    "keywords": ["ETIMEDOUT", "Could not resolve host", "Connection refused", "Network is unreachable", "timed out"]
+  },
+  "syntax": {
+    "name": "Syntax",
+    "keywords": ["SyntaxError", "Unexpected token", "error[E", "ParseError", "IndentationError"]
+  },
+  "tests": {
+    "name": "Tests",
+    "keywords": ["FAILED", "AssertionError", "test(s) failed", "FAIL ", "tests failed"]
+  },
+  "filesystem": {
+    "name": "Filesystem",
+    "keywords": ["No such file or directory", "ENOENT", "cannot find", "does not exist"]
+  },
+  "other": {
+    "name": "Other",
+    "keywords": []
+  }
+}

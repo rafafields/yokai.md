@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "SessionStart": [
+      { "matcher": "startup|resume|compact",
+        "hooks": [{ "type": "command", "command": ".claude/hooks/yokai-sessionstart.sh", "timeout": 10 }] }
+    ],
+    "UserPromptSubmit": [
+      { "matcher": "",
+        "hooks": [{ "type": "command", "command": ".claude/hooks/yokai-userprompt.sh", "timeout": 10 }] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": ".claude/hooks/yokai-posttooluse.sh", "timeout": 10 }] }
+    ],
+    "PostToolUseFailure": [
+      { "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": ".claude/hooks/yokai-posttooluse.sh", "timeout": 10 }] }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": ".claude/hooks/yokai-statusline.sh",
+    "refreshInterval": 5
+  }
+}
