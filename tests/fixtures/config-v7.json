@@ -1,0 +1,19 @@
+{
+  "birth": "2026-01-01",
+  "life": __LIFE__,
+  "hunger_today": __HUNGER__,
+  "date": "__DATE__",
+  "quiet_streak": __STREAK__,
+  "categories": {
+    "git": 7,
+    "dependencies": 0,
+    "permissions": 0,
+    "network": 0,
+    "syntax": 0,
+    "tests": 3,
+    "filesystem": 0,
+    "other": 2
+  },
+  "emoji": "👻",
+  "name": "Kage no Ame"
+}

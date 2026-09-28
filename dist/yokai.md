@@ -176,6 +176,7 @@ description: Yokai — sarcastic error counter for this project (summon, forget,
 set -euo pipefail
 # Directory of this script, whether invoked with / or \ separators.
 HOOK_DIR="${0%[/\\]*}"; [ "$HOOK_DIR" = "$0" ] && HOOK_DIR=.
+# shellcheck source=yokai-lib.sh
 . "$HOOK_DIR/yokai-lib.sh"
 
 yokai_read_input
@@ -218,6 +219,7 @@ fi
 set -euo pipefail
 # Directory of this script, whether invoked with / or \ separators.
 HOOK_DIR="${0%[/\\]*}"; [ "$HOOK_DIR" = "$0" ] && HOOK_DIR=.
+# shellcheck source=yokai-lib.sh
 . "$HOOK_DIR/yokai-lib.sh"
 
 yokai_read_input
@@ -350,6 +352,7 @@ echo "YOKAI REPORT (show this exactly as given, do not rewrite it or add anythin
 set -euo pipefail
 # Directory of this script, whether invoked with / or \ separators.
 HOOK_DIR="${0%[/\\]*}"; [ "$HOOK_DIR" = "$0" ] && HOOK_DIR=.
+# shellcheck source=yokai-lib.sh
 . "$HOOK_DIR/yokai-lib.sh"
 
 yokai_read_input
@@ -435,6 +438,7 @@ exit 0
 # is pure rendering in the terminal status bar.
 # Directory of this script, whether invoked with / or \ separators.
 HOOK_DIR="${0%[/\\]*}"; [ "$HOOK_DIR" = "$0" ] && HOOK_DIR=.
+# shellcheck source=yokai-lib.sh
 . "$HOOK_DIR/yokai-lib.sh"
 
 yokai_read_input
@@ -484,6 +488,10 @@ fi
 
 ```bash
 #!/usr/bin/env bash
+# Helpers return results in globals (no subshells: forks cost ~100 ms on
+# Git Bash), which the hooks sourcing this file read.
+# shellcheck disable=SC2034
+#
 # Shared helpers for the yokai hooks. Sourced, never executed. Pure bash
 # (3.2-compatible, so macOS's stock bash works) — no jq, python or node.
 

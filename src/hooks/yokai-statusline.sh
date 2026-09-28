@@ -4,6 +4,7 @@
 # is pure rendering in the terminal status bar.
 # Directory of this script, whether invoked with / or \ separators.
 HOOK_DIR="${0%[/\\]*}"; [ "$HOOK_DIR" = "$0" ] && HOOK_DIR=.
+# shellcheck source=yokai-lib.sh
 . "$HOOK_DIR/yokai-lib.sh"
 
 yokai_read_input

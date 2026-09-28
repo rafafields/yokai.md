@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Helpers return results in globals (no subshells: forks cost ~100 ms on
+# Git Bash), which the hooks sourcing this file read.
+# shellcheck disable=SC2034
+#
 # Shared helpers for the yokai hooks. Sourced, never executed. Pure bash
 # (3.2-compatible, so macOS's stock bash works) — no jq, python or node.
 
