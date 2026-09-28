@@ -6,6 +6,13 @@
 # Shared helpers for the yokai hooks. Sourced, never executed. Pure bash
 # (3.2-compatible, so macOS's stock bash works) — no jq, python or node.
 
+# yokai_say LABEL TEXT: prints a message for the model to relay to the
+# user word for word. Every message the yokai sends goes through here, so
+# none of them gets paraphrased.
+yokai_say() {
+  printf '%s (show this exactly as given, do not rewrite it or add anything): %s\n' "$1" "$2"
+}
+
 # Reads the hook's stdin JSON into YOKAI_INPUT. The read builtin is fast
 # for small input but reads a pipe one byte at a time, and $(cat) costs a
 # fork (~170 ms on Git Bash) even for tiny input — so the first 64 KB go

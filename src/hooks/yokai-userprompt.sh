@@ -28,13 +28,13 @@ yokai_paths
 yokai_now
 
 if [ "$SUB" = help ]; then
-  echo "YOKAI COMMANDS (show this exactly as given, do not rewrite it or add anything): /yokai summon — birth a new yokai in this project. /yokai forget — erase the current yokai and its counters. /yokai report — a sarcastic breakdown of failures by category. /yokai help — this list."
+  yokai_say "YOKAI COMMANDS" "/yokai summon — birth a new yokai in this project. /yokai forget — erase the current yokai and its counters. /yokai report — a sarcastic breakdown of failures by category. /yokai help — this list."
   exit 0
 fi
 
 if [ "$SUB" = summon ]; then
   if [ -f "$CONFIG" ]; then
-    echo "there is already a yokai counting failures in this project."
+    yokai_say "YOKAI" "there is already a yokai counting failures in this project."
     exit 0
   fi
 
@@ -78,20 +78,28 @@ if [ "$SUB" = summon ]; then
 
   BIRTH="$TODAY" DATE="$TODAY" LIFE=0 HUNGER=0 STREAK=0
   config_save
-  echo "congratulations, you just summoned a yokai named $NAME. I hope you know what you are doing... this one feeds on your terminal failures, not conversation. if the project stops failing for 7 straight days, it leaves on its own."
+  yokai_say "YOKAI" "congratulations, you just summoned a yokai named $NAME. I hope you know what you are doing... this one feeds on your terminal failures, not conversation. if the project stops failing for 7 straight days, it leaves on its own."
   exit 0
 fi
 
-[ -f "$CONFIG" ] || exit 0
+# forget and report need a yokai. Without one, say so — silence would
+# leave the model to improvise an answer.
+if [ ! -f "$CONFIG" ]; then
+  yokai_say "YOKAI" "no yokai here. /yokai summon to get one."
+  exit 0
+fi
 
 if [ "$SUB" = forget ]; then
   rm -f "$CONFIG"
-  echo "yokai forgotten. /yokai summon for a new one."
+  yokai_say "YOKAI" "yokai forgotten. /yokai summon for a new one."
   exit 0
 fi
 
 # report
-config_load || exit 0
+if ! config_load; then
+  yokai_say "YOKAI" "no yokai here. /yokai summon to get one."
+  exit 0
+fi
 [ -n "$NAME" ] || NAME="unnamed"
 DAYS_UNTIL_LEAVE=$((7 - STREAK))
 
@@ -108,8 +116,11 @@ for ((k = 0; k < ${#CAT_KEYS[@]}; k++)); do
   USED[best]=1
   ORDER+=("$best")
 done
-TOP="none"
-[ "${#ORDER[@]}" -gt 0 ] && TOP="${CAT_KEYS[ORDER[0]]} (${CAT_VALS[ORDER[0]]})"
+# With no failures yet, every category ties at 0: don't crown the first.
+TOP="none yet"
+if [ "$LIFE" -gt 0 ] && [ "${#ORDER[@]}" -gt 0 ]; then
+  TOP="${CAT_KEYS[ORDER[0]]} (${CAT_VALS[ORDER[0]]})"
+fi
 DETAIL=""
 for ((k = 0; k < ${#ORDER[@]}; k++)); do
   i="${ORDER[k]}"
@@ -124,4 +135,4 @@ if [ "$STREAK" -eq 0 ]; then
 else
   STATUS="$DAYS_UNTIL_LEAVE quiet day(s) left and I'm gone"
 fi
-echo "YOKAI REPORT (show this exactly as given, do not rewrite it or add anything): $NAME here · total failures: $LIFE · main headache: $TOP · $DETAIL · $STATUS — $PICK"
+yokai_say "YOKAI REPORT" "$NAME here · total failures: $LIFE · main headache: $TOP · $DETAIL · $STATUS — $PICK"

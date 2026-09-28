@@ -141,16 +141,18 @@ model:
 
 `/yokai summon` · `/yokai forget` · `/yokai report` · `/yokai help`
 
-`report` and `help` are the only ways the yokai "speaks" in the chat. Both
-hooks build the whole text and hand it to the agent already finished —
-see section 7.
+These commands are the only way the yokai "speaks" in the chat, plus its
+one farewell (section 3). The hook builds the whole text and hands it to
+the agent already finished, tagged `YOKAI …` — see section 7. `forget`
+and `report` without a yokai answer "no yokai here" instead of staying
+silent.
 
-## 7. Rule for the agent: don't rewrite report or help
+## 7. Rule for the agent: don't rewrite the yokai's messages
 
-When `/yokai report` or `/yokai help` gives you text already built as
-context, **show it exactly as is**, without rewriting it, summarizing it,
-or adding your own commentary. Outside of these two commands, the yokai
-doesn't take part in the conversation at all.
+When a hook hands you text tagged `YOKAI`, `YOKAI COMMANDS`, `YOKAI
+REPORT` or `YOKAI FAREWELL` as context, **show it exactly as is**, without
+rewriting it, summarizing it, or adding your own commentary. Outside of
+those messages, the yokai doesn't take part in the conversation at all.
 
 ---
 
@@ -241,13 +243,13 @@ yokai_paths
 yokai_now
 
 if [ "$SUB" = help ]; then
-  echo "YOKAI COMMANDS (show this exactly as given, do not rewrite it or add anything): /yokai summon — birth a new yokai in this project. /yokai forget — erase the current yokai and its counters. /yokai report — a sarcastic breakdown of failures by category. /yokai help — this list."
+  yokai_say "YOKAI COMMANDS" "/yokai summon — birth a new yokai in this project. /yokai forget — erase the current yokai and its counters. /yokai report — a sarcastic breakdown of failures by category. /yokai help — this list."
   exit 0
 fi
 
 if [ "$SUB" = summon ]; then
   if [ -f "$CONFIG" ]; then
-    echo "there is already a yokai counting failures in this project."
+    yokai_say "YOKAI" "there is already a yokai counting failures in this project."
     exit 0
   fi
 
@@ -291,20 +293,28 @@ if [ "$SUB" = summon ]; then
 
   BIRTH="$TODAY" DATE="$TODAY" LIFE=0 HUNGER=0 STREAK=0
   config_save
-  echo "congratulations, you just summoned a yokai named $NAME. I hope you know what you are doing... this one feeds on your terminal failures, not conversation. if the project stops failing for 7 straight days, it leaves on its own."
+  yokai_say "YOKAI" "congratulations, you just summoned a yokai named $NAME. I hope you know what you are doing... this one feeds on your terminal failures, not conversation. if the project stops failing for 7 straight days, it leaves on its own."
   exit 0
 fi
 
-[ -f "$CONFIG" ] || exit 0
+# forget and report need a yokai. Without one, say so — silence would
+# leave the model to improvise an answer.
+if [ ! -f "$CONFIG" ]; then
+  yokai_say "YOKAI" "no yokai here. /yokai summon to get one."
+  exit 0
+fi
 
 if [ "$SUB" = forget ]; then
   rm -f "$CONFIG"
-  echo "yokai forgotten. /yokai summon for a new one."
+  yokai_say "YOKAI" "yokai forgotten. /yokai summon for a new one."
   exit 0
 fi
 
 # report
-config_load || exit 0
+if ! config_load; then
+  yokai_say "YOKAI" "no yokai here. /yokai summon to get one."
+  exit 0
+fi
 [ -n "$NAME" ] || NAME="unnamed"
 DAYS_UNTIL_LEAVE=$((7 - STREAK))
 
@@ -321,8 +331,11 @@ for ((k = 0; k < ${#CAT_KEYS[@]}; k++)); do
   USED[best]=1
   ORDER+=("$best")
 done
-TOP="none"
-[ "${#ORDER[@]}" -gt 0 ] && TOP="${CAT_KEYS[ORDER[0]]} (${CAT_VALS[ORDER[0]]})"
+# With no failures yet, every category ties at 0: don't crown the first.
+TOP="none yet"
+if [ "$LIFE" -gt 0 ] && [ "${#ORDER[@]}" -gt 0 ]; then
+  TOP="${CAT_KEYS[ORDER[0]]} (${CAT_VALS[ORDER[0]]})"
+fi
 DETAIL=""
 for ((k = 0; k < ${#ORDER[@]}; k++)); do
   i="${ORDER[k]}"
@@ -337,7 +350,7 @@ if [ "$STREAK" -eq 0 ]; then
 else
   STATUS="$DAYS_UNTIL_LEAVE quiet day(s) left and I'm gone"
 fi
-echo "YOKAI REPORT (show this exactly as given, do not rewrite it or add anything): $NAME here · total failures: $LIFE · main headache: $TOP · $DETAIL · $STATUS — $PICK"
+yokai_say "YOKAI REPORT" "$NAME here · total failures: $LIFE · main headache: $TOP · $DETAIL · $STATUS — $PICK"
 ```
 
 ### 8.4 `.claude/hooks/yokai-posttooluse.sh`
@@ -494,6 +507,13 @@ fi
 #
 # Shared helpers for the yokai hooks. Sourced, never executed. Pure bash
 # (3.2-compatible, so macOS's stock bash works) — no jq, python or node.
+
+# yokai_say LABEL TEXT: prints a message for the model to relay to the
+# user word for word. Every message the yokai sends goes through here, so
+# none of them gets paraphrased.
+yokai_say() {
+  printf '%s (show this exactly as given, do not rewrite it or add anything): %s\n' "$1" "$2"
+}
 
 # Reads the hook's stdin JSON into YOKAI_INPUT. The read builtin is fast
 # for small input but reads a pipe one byte at a time, and $(cat) costs a

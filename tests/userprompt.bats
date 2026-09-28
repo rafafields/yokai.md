@@ -22,7 +22,7 @@ load test_helper
 @test "summon creates a config with every catalog category at 0" {
   run prompt '/yokai summon'
   [ "$status" -eq 0 ]
-  [[ $output == "congratulations, you just summoned a yokai named "*". I hope you know what you are doing"* ]]
+  [[ $output == "YOKAI (show this exactly as given, do not rewrite it or add anything): congratulations, you just summoned a yokai named "*". I hope you know what you are doing"* ]]
   assert_valid_json "$CONFIG"
   [ "$(cfg birth)" = "$TODAY" ]
   [ "$(cfg date)" = "$TODAY" ]
@@ -68,7 +68,7 @@ load test_helper
 
 @test "summon is case-insensitive" {
   run prompt '/YOKAI Summon'
-  [[ $output == "congratulations"* ]]
+  [[ $output == *": congratulations"* ]]
   [ -f "$CONFIG" ]
 }
 
@@ -76,14 +76,14 @@ load test_helper
   v7_config 42 3 "$TODAY" 0
   before=$(cat "$CONFIG")
   run prompt '/yokai summon'
-  [ "$output" = "there is already a yokai counting failures in this project." ]
+  [ "$output" = "YOKAI (show this exactly as given, do not rewrite it or add anything): there is already a yokai counting failures in this project." ]
   [ "$(cat "$CONFIG")" = "$before" ]
 }
 
 @test "forget deletes the yokai" {
   summon
   run prompt '/yokai forget'
-  [ "$output" = "yokai forgotten. /yokai summon for a new one." ]
+  [ "$output" = "YOKAI (show this exactly as given, do not rewrite it or add anything): yokai forgotten. /yokai summon for a new one." ]
   [ ! -f "$CONFIG" ]
 }
 
@@ -110,9 +110,15 @@ load test_helper
   [[ $output == *": unnamed here · "* ]]
 }
 
-@test "report and forget without a yokai stay silent (Y-12, not fixed yet)" {
+@test "report and forget without a yokai say so instead of staying silent (Y-12)" {
+  for sub in report forget; do
+    run prompt "/yokai $sub"
+    [ "$output" = "YOKAI (show this exactly as given, do not rewrite it or add anything): no yokai here. /yokai summon to get one." ]
+  done
+}
+
+@test "report with no failures yet doesn't crown a category (Y-13)" {
+  summon
   run prompt '/yokai report'
-  [ -z "$output" ]
-  run prompt '/yokai forget'
-  [ -z "$output" ]
+  [[ $output == *" · total failures: 0 · main headache: none yet · "* ]]
 }

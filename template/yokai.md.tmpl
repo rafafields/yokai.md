@@ -141,16 +141,18 @@ model:
 
 `/yokai summon` · `/yokai forget` · `/yokai report` · `/yokai help`
 
-`report` and `help` are the only ways the yokai "speaks" in the chat. Both
-hooks build the whole text and hand it to the agent already finished —
-see section 7.
+These commands are the only way the yokai "speaks" in the chat, plus its
+one farewell (section 3). The hook builds the whole text and hands it to
+the agent already finished, tagged `YOKAI …` — see section 7. `forget`
+and `report` without a yokai answer "no yokai here" instead of staying
+silent.
 
-## 7. Rule for the agent: don't rewrite report or help
+## 7. Rule for the agent: don't rewrite the yokai's messages
 
-When `/yokai report` or `/yokai help` gives you text already built as
-context, **show it exactly as is**, without rewriting it, summarizing it,
-or adding your own commentary. Outside of these two commands, the yokai
-doesn't take part in the conversation at all.
+When a hook hands you text tagged `YOKAI`, `YOKAI COMMANDS`, `YOKAI
+REPORT` or `YOKAI FAREWELL` as context, **show it exactly as is**, without
+rewriting it, summarizing it, or adding your own commentary. Outside of
+those messages, the yokai doesn't take part in the conversation at all.
 
 ---
 
