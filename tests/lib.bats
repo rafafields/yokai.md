@@ -51,6 +51,39 @@ setup() {
   [ "$JSON_STR" = yes ]
 }
 
+@test "days_from_civil matches known day numbers" {
+  while read -r d want; do
+    days_from_civil "$d"
+    if [ "$DAYS" != "$want" ]; then
+      echo "$d: got $DAYS, want $want"
+      return 1
+    fi
+  done <<'EOF'
+1970-01-01 0
+1970-01-02 1
+2000-02-29 11016
+2000-03-01 11017
+2024-02-29 19782
+2026-01-01 20454
+2099-12-31 47481
+EOF
+}
+
+@test "days_from_civil agrees with date across 2024-2027" {
+  date -u -d 2024-01-01 +%s >/dev/null 2>&1 || skip "needs GNU date"
+  start=$(($(date -u -d 2024-01-01 +%s) / 86400))
+  for ((i = 0; i < 1461; i += 13)); do
+    d=$(date -u -d "@$(((start + i) * 86400))" +%Y-%m-%d)
+    days_from_civil "$d"
+    [ "$DAYS" -eq $((start + i)) ] || { echo "$d: got $DAYS"; return 1; }
+  done
+}
+
+@test "days_from_civil rejects non-dates" {
+  run days_from_civil "not-a-date"
+  [ "$status" -eq 1 ]
+}
+
 @test "config_save and config_load round-trip" {
   CONFIG="$BATS_TEST_TMPDIR/config.json"
   BIRTH=2026-01-01 LIFE=7 HUNGER=2 DATE=2026-01-02 STREAK=1

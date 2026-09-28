@@ -90,6 +90,64 @@ yokai_now() {
   printf -v TODAY '%(%Y-%m-%d)T' -1 2>/dev/null || TODAY=$(date +%Y-%m-%d)
 }
 
+# days_from_civil YYYY-MM-DD: sets DAYS to the number of days since
+# 1970-01-01 (Howard Hinnant's algorithm). Pure arithmetic, because
+# `date -d` is GNU-only. Returns 1 if the argument isn't a date.
+days_from_civil() {
+  [[ $1 =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || return 1
+  local y=$((10#${1:0:4})) m=$((10#${1:5:2})) d=$((10#${1:8:2}))
+  if [ "$m" -le 2 ]; then y=$((y - 1)); fi
+  local era=$((y / 400))
+  local yoe=$((y - era * 400))
+  local doy=$(((153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1))
+  local doe=$((yoe * 365 + yoe / 4 - yoe / 100 + doy))
+  DAYS=$((era * 146097 + doe - 719468))
+}
+
+YOKAI_QUIET_BELOW=20
+YOKAI_LEAVE_AFTER=7
+YOKAI_FAREWELL_TEXT="you have gone 7 days without feeding me properly. I am leaving — nobody needs this anymore. /yokai summon if the chaos ever comes back."
+
+# yokai_rollover: closes every day between the config's DATE and TODAY.
+# Call it after config_load and yokai_now, from any hook, so a session
+# left open across midnight rolls over too. Each closed day is quiet if
+# it had fewer than 20 failures: the last recorded day had HUNGER, and
+# days with no session at all had 0. Returns:
+#   0  the config changed (the caller saves it)
+#   1  nothing to do (same day, or the clock went backwards)
+#   2  the yokai left: config deleted, farewell queued for yokai_farewell
+yokai_rollover() {
+  [ "$DATE" != "$TODAY" ] || return 1
+  local gap=1 today_days
+  if days_from_civil "$TODAY"; then
+    today_days=$DAYS
+    if days_from_civil "$DATE"; then gap=$((today_days - DAYS)); fi
+  fi
+  [ "$gap" -gt 0 ] || return 1
+  if [ "$HUNGER" -lt "$YOKAI_QUIET_BELOW" ]; then
+    STREAK=$((STREAK + gap))
+  else
+    STREAK=$((gap - 1))
+  fi
+  if [ "$STREAK" -ge "$YOKAI_LEAVE_AFTER" ]; then
+    rm -f "$CONFIG"
+    printf '%s\n' "$YOKAI_FAREWELL_TEXT" > "$YOKAI_DIR/farewell.txt"
+    return 2
+  fi
+  DATE="$TODAY"
+  HUNGER=0
+}
+
+# yokai_farewell: delivers a queued farewell, once. Only hooks whose
+# stdout reaches the model (SessionStart, UserPromptSubmit) call it.
+yokai_farewell() {
+  local f="$YOKAI_DIR/farewell.txt" msg=""
+  [ -f "$f" ] || return 0
+  IFS= read -r msg < "$f" || true
+  rm -f "$f"
+  yokai_say "YOKAI FAREWELL" "${msg:-$YOKAI_FAREWELL_TEXT}"
+}
+
 # catalog_lines FILE: loads non-empty, non-comment (#) lines into LINES.
 catalog_lines() {
   LINES=()

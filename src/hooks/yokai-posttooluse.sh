@@ -41,6 +41,12 @@ else
 fi
 
 config_load || exit 0
+yokai_now
+# A session left open across midnight rolls over here too. If that makes
+# the yokai leave, this failure has no one left to feed.
+rc=0
+yokai_rollover || rc=$?
+[ "$rc" -ne 2 ] || exit 0
 load_errors
 
 # First catalog line whose keyword appears in the text wins. Plain
@@ -78,7 +84,6 @@ config_save
 if [ $((LIFE % 10)) -eq 0 ]; then
   catalog_lines "$YOKAI_DIR/phrases.txt"
   pick_line
-  yokai_now
   printf '%s\n%s\n' "$NOW" "$PICK" > "$YOKAI_DIR/statusline_msg.txt"
 fi
 exit 0

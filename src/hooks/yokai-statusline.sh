@@ -40,6 +40,11 @@ format_count() {
 }
 
 config_load || exit 0
+# The statusline never writes the config (it runs every few seconds);
+# a count from a previous day just displays as today's 0 until a hook
+# rolls it over.
+yokai_now
+[ "$DATE" = "$TODAY" ] || HUNGER=0
 format_count "$LIFE"
 
 # Yokais summoned before v7 have no name: plain emoji+counters line.

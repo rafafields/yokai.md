@@ -109,3 +109,8 @@ in_file() {
   done < "$2"
   return 1
 }
+
+# days_ago N: the date N days before today, YYYY-MM-DD (GNU or BSD date).
+days_ago() {
+  date -d "$1 days ago" +%Y-%m-%d 2>/dev/null || date -v "-$1d" +%Y-%m-%d
+}

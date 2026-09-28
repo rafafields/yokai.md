@@ -10,6 +10,12 @@ HOOK_DIR="${0%[/\\]*}"; [ "$HOOK_DIR" = "$0" ] && HOOK_DIR=.
 . "$HOOK_DIR/yokai-lib.sh"
 
 yokai_read_input
+yokai_paths
+yokai_now
+# A farewell queued by a hook that can't talk (see yokai_rollover) goes
+# out with whatever the user types next.
+yokai_farewell
+
 json_str prompt || exit 0
 shopt -s nocasematch
 [[ $JSON_STR =~ ^/yokai[[:space:]]+([a-z]+) ]] || exit 0
@@ -24,9 +30,6 @@ case "$SUB" in
   *) exit 0 ;;
 esac
 
-yokai_paths
-yokai_now
-
 if [ "$SUB" = help ]; then
   yokai_say "YOKAI COMMANDS" "/yokai summon — birth a new yokai in this project. /yokai forget — erase the current yokai and its counters. /yokai report — a sarcastic breakdown of failures by category. /yokai help — this list."
   exit 0
@@ -37,6 +40,7 @@ if [ "$SUB" = summon ]; then
     yokai_say "YOKAI" "there is already a yokai counting failures in this project."
     exit 0
   fi
+  rm -f "$YOKAI_DIR/farewell.txt"
 
   load_errors
   CAT_KEYS=() CAT_VALS=()
@@ -100,6 +104,14 @@ if ! config_load; then
   yokai_say "YOKAI" "no yokai here. /yokai summon to get one."
   exit 0
 fi
+# Roll over first, so the streak in the report is today's.
+rc=0
+yokai_rollover || rc=$?
+if [ "$rc" -eq 2 ]; then
+  yokai_farewell
+  exit 0
+fi
+if [ "$rc" -eq 0 ]; then config_save; fi
 [ -n "$NAME" ] || NAME="unnamed"
 DAYS_UNTIL_LEAVE=$((7 - STREAK))
 

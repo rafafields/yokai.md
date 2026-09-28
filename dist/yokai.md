@@ -68,6 +68,7 @@ project/
       names.txt                     # fixed catalog: JP word bank + suffixes + famous yokai names, for the name assigned at birth
       config.json                   # born with /yokai summon — birth, life, hunger, streak, categories, emoji, name
       statusline_msg.txt            # temporary message (with expiry) after a one-liner fires — self-cleans
+      farewell.txt                  # queued goodbye when the yokai leaves mid-session — delivered once, then deleted
 ```
 
 ---
@@ -95,13 +96,17 @@ name):
 - **Life**: cumulative count of total failures caught in the project. No
   ceiling, never decreases — displayed as "Yokai HP" in the statusline.
 - **Daily hunger**: failures caught during the current calendar day. Resets
-  every day (rollover in `SessionStart`, section 8.2). Informal target:
-  ~20/day. Displayed as "Console fails" in the statusline.
+  every day. The rollover runs in every hook, so a session left open
+  across midnight rolls over too. Informal target: ~20/day. Displayed as
+  "Console fails" in the statusline.
 - **Quiet streak**: consecutive days where daily hunger didn't reach 20.
-  Resets to 0 the moment a day does.
-- **Final departure**: at 7 days of quiet streak, the yokai says goodbye
-  (one-time message, see section 8.2) and `config.json` gets deleted. It
-  doesn't come back on its own — `/yokai summon` again if chaos returns.
+  Resets to 0 the moment a day does. Days with no session at all had 0
+  failures, so they count as quiet: a week away is a quiet week.
+- **Final departure**: at 7 days of quiet streak, `config.json` gets
+  deleted and the yokai says goodbye — a one-time `YOKAI FAREWELL`
+  message, delivered at session start, or with the next prompt if the
+  rollover happened mid-session. It doesn't come back on its own —
+  `/yokai summon` again if chaos returns.
 
 ## 4. Failure detection and categorization
 
@@ -172,9 +177,9 @@ description: Yokai — sarcastic error counter for this project (summon, forget,
 
 ```bash
 #!/usr/bin/env bash
-# SessionStart: only handles the daily rollover and the final departure.
-# Prints nothing to context except the one farewell message (plain
-# stdout on SessionStart is added to the model's context).
+# SessionStart: runs the daily rollover (see yokai_rollover) and delivers
+# a queued farewell. Prints nothing to context except that farewell
+# (plain stdout on SessionStart is added to the model's context).
 set -euo pipefail
 # Directory of this script, whether invoked with / or \ separators.
 HOOK_DIR="${0%[/\\]*}"; [ "$HOOK_DIR" = "$0" ] && HOOK_DIR=.
@@ -183,31 +188,18 @@ HOOK_DIR="${0%[/\\]*}"; [ "$HOOK_DIR" = "$0" ] && HOOK_DIR=.
 
 yokai_read_input
 yokai_paths
-[ -f "$CONFIG" ] || exit 0
-config_load || exit 0
+[ -d "$YOKAI_DIR" ] || exit 0
 yokai_now
 
 # Leftover from v7, which kept the one-liner in a .json file.
 rm -f "$YOKAI_DIR/statusline_msg.json"
 
-if [ "$TODAY" != "$DATE" ]; then
-  THRESHOLD=20
-  if [ "$HUNGER" -lt "$THRESHOLD" ]; then
-    STREAK=$((STREAK + 1))
-  else
-    STREAK=0
-  fi
-
-  if [ "$STREAK" -ge 7 ]; then
-    rm -f "$CONFIG"
-    echo "you have gone 7 days without feeding me properly. I am leaving — nobody needs this anymore. /yokai summon if the chaos ever comes back."
-    exit 0
-  fi
-
-  DATE="$TODAY"
-  HUNGER=0
-  config_save
+if [ -f "$CONFIG" ] && config_load; then
+  rc=0
+  yokai_rollover || rc=$?
+  if [ "$rc" -eq 0 ]; then config_save; fi
 fi
+yokai_farewell
 ```
 
 ### 8.3 `.claude/hooks/yokai-userprompt.sh`
@@ -225,6 +217,12 @@ HOOK_DIR="${0%[/\\]*}"; [ "$HOOK_DIR" = "$0" ] && HOOK_DIR=.
 . "$HOOK_DIR/yokai-lib.sh"
 
 yokai_read_input
+yokai_paths
+yokai_now
+# A farewell queued by a hook that can't talk (see yokai_rollover) goes
+# out with whatever the user types next.
+yokai_farewell
+
 json_str prompt || exit 0
 shopt -s nocasematch
 [[ $JSON_STR =~ ^/yokai[[:space:]]+([a-z]+) ]] || exit 0
@@ -239,9 +237,6 @@ case "$SUB" in
   *) exit 0 ;;
 esac
 
-yokai_paths
-yokai_now
-
 if [ "$SUB" = help ]; then
   yokai_say "YOKAI COMMANDS" "/yokai summon — birth a new yokai in this project. /yokai forget — erase the current yokai and its counters. /yokai report — a sarcastic breakdown of failures by category. /yokai help — this list."
   exit 0
@@ -252,6 +247,7 @@ if [ "$SUB" = summon ]; then
     yokai_say "YOKAI" "there is already a yokai counting failures in this project."
     exit 0
   fi
+  rm -f "$YOKAI_DIR/farewell.txt"
 
   load_errors
   CAT_KEYS=() CAT_VALS=()
@@ -315,6 +311,14 @@ if ! config_load; then
   yokai_say "YOKAI" "no yokai here. /yokai summon to get one."
   exit 0
 fi
+# Roll over first, so the streak in the report is today's.
+rc=0
+yokai_rollover || rc=$?
+if [ "$rc" -eq 2 ]; then
+  yokai_farewell
+  exit 0
+fi
+if [ "$rc" -eq 0 ]; then config_save; fi
 [ -n "$NAME" ] || NAME="unnamed"
 DAYS_UNTIL_LEAVE=$((7 - STREAK))
 
@@ -399,6 +403,12 @@ else
 fi
 
 config_load || exit 0
+yokai_now
+# A session left open across midnight rolls over here too. If that makes
+# the yokai leave, this failure has no one left to feed.
+rc=0
+yokai_rollover || rc=$?
+[ "$rc" -ne 2 ] || exit 0
 load_errors
 
 # First catalog line whose keyword appears in the text wins. Plain
@@ -436,7 +446,6 @@ config_save
 if [ $((LIFE % 10)) -eq 0 ]; then
   catalog_lines "$YOKAI_DIR/phrases.txt"
   pick_line
-  yokai_now
   printf '%s\n%s\n' "$NOW" "$PICK" > "$YOKAI_DIR/statusline_msg.txt"
 fi
 exit 0
@@ -487,6 +496,11 @@ format_count() {
 }
 
 config_load || exit 0
+# The statusline never writes the config (it runs every few seconds);
+# a count from a previous day just displays as today's 0 until a hook
+# rolls it over.
+yokai_now
+[ "$DATE" = "$TODAY" ] || HUNGER=0
 format_count "$LIFE"
 
 # Yokais summoned before v7 have no name: plain emoji+counters line.
@@ -590,6 +604,64 @@ yokai_paths() {
 yokai_now() {
   printf -v NOW '%(%s)T' -1 2>/dev/null || NOW=$(date +%s)
   printf -v TODAY '%(%Y-%m-%d)T' -1 2>/dev/null || TODAY=$(date +%Y-%m-%d)
+}
+
+# days_from_civil YYYY-MM-DD: sets DAYS to the number of days since
+# 1970-01-01 (Howard Hinnant's algorithm). Pure arithmetic, because
+# `date -d` is GNU-only. Returns 1 if the argument isn't a date.
+days_from_civil() {
+  [[ $1 =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || return 1
+  local y=$((10#${1:0:4})) m=$((10#${1:5:2})) d=$((10#${1:8:2}))
+  if [ "$m" -le 2 ]; then y=$((y - 1)); fi
+  local era=$((y / 400))
+  local yoe=$((y - era * 400))
+  local doy=$(((153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1))
+  local doe=$((yoe * 365 + yoe / 4 - yoe / 100 + doy))
+  DAYS=$((era * 146097 + doe - 719468))
+}
+
+YOKAI_QUIET_BELOW=20
+YOKAI_LEAVE_AFTER=7
+YOKAI_FAREWELL_TEXT="you have gone 7 days without feeding me properly. I am leaving — nobody needs this anymore. /yokai summon if the chaos ever comes back."
+
+# yokai_rollover: closes every day between the config's DATE and TODAY.
+# Call it after config_load and yokai_now, from any hook, so a session
+# left open across midnight rolls over too. Each closed day is quiet if
+# it had fewer than 20 failures: the last recorded day had HUNGER, and
+# days with no session at all had 0. Returns:
+#   0  the config changed (the caller saves it)
+#   1  nothing to do (same day, or the clock went backwards)
+#   2  the yokai left: config deleted, farewell queued for yokai_farewell
+yokai_rollover() {
+  [ "$DATE" != "$TODAY" ] || return 1
+  local gap=1 today_days
+  if days_from_civil "$TODAY"; then
+    today_days=$DAYS
+    if days_from_civil "$DATE"; then gap=$((today_days - DAYS)); fi
+  fi
+  [ "$gap" -gt 0 ] || return 1
+  if [ "$HUNGER" -lt "$YOKAI_QUIET_BELOW" ]; then
+    STREAK=$((STREAK + gap))
+  else
+    STREAK=$((gap - 1))
+  fi
+  if [ "$STREAK" -ge "$YOKAI_LEAVE_AFTER" ]; then
+    rm -f "$CONFIG"
+    printf '%s\n' "$YOKAI_FAREWELL_TEXT" > "$YOKAI_DIR/farewell.txt"
+    return 2
+  fi
+  DATE="$TODAY"
+  HUNGER=0
+}
+
+# yokai_farewell: delivers a queued farewell, once. Only hooks whose
+# stdout reaches the model (SessionStart, UserPromptSubmit) call it.
+yokai_farewell() {
+  local f="$YOKAI_DIR/farewell.txt" msg=""
+  [ -f "$f" ] || return 0
+  IFS= read -r msg < "$f" || true
+  rm -f "$f"
+  yokai_say "YOKAI FAREWELL" "${msg:-$YOKAI_FAREWELL_TEXT}"
 }
 
 # catalog_lines FILE: loads non-empty, non-comment (#) lines into LINES.

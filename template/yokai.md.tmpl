@@ -68,6 +68,7 @@ project/
       names.txt                     # fixed catalog: JP word bank + suffixes + famous yokai names, for the name assigned at birth
       config.json                   # born with /yokai summon — birth, life, hunger, streak, categories, emoji, name
       statusline_msg.txt            # temporary message (with expiry) after a one-liner fires — self-cleans
+      farewell.txt                  # queued goodbye when the yokai leaves mid-session — delivered once, then deleted
 ```
 
 ---
@@ -95,13 +96,17 @@ name):
 - **Life**: cumulative count of total failures caught in the project. No
   ceiling, never decreases — displayed as "Yokai HP" in the statusline.
 - **Daily hunger**: failures caught during the current calendar day. Resets
-  every day (rollover in `SessionStart`, section 8.2). Informal target:
-  ~20/day. Displayed as "Console fails" in the statusline.
+  every day. The rollover runs in every hook, so a session left open
+  across midnight rolls over too. Informal target: ~20/day. Displayed as
+  "Console fails" in the statusline.
 - **Quiet streak**: consecutive days where daily hunger didn't reach 20.
-  Resets to 0 the moment a day does.
-- **Final departure**: at 7 days of quiet streak, the yokai says goodbye
-  (one-time message, see section 8.2) and `config.json` gets deleted. It
-  doesn't come back on its own — `/yokai summon` again if chaos returns.
+  Resets to 0 the moment a day does. Days with no session at all had 0
+  failures, so they count as quiet: a week away is a quiet week.
+- **Final departure**: at 7 days of quiet streak, `config.json` gets
+  deleted and the yokai says goodbye — a one-time `YOKAI FAREWELL`
+  message, delivered at session start, or with the next prompt if the
+  rollover happened mid-session. It doesn't come back on its own —
+  `/yokai summon` again if chaos returns.
 
 ## 4. Failure detection and categorization
 
