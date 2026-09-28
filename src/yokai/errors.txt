@@ -1,0 +1,46 @@
+# Error category catalog. One keyword per line: category|keyword|
+#
+# Keywords are case-insensitive plain substrings (never regex), searched
+# in the failed command + its output. The pipes delimit the keyword so
+# leading/trailing spaces stay visible ("git |" ends in a space), which
+# means a keyword can't contain "|". Lines are tried top to bottom and the
+# first match wins, so keep each category's lines together. A line with
+# an empty keyword just declares a category (like "other", the fallback).
+# v1, keyword-based — expect to tune it with real usage.
+git|git |
+git|merge conflict|
+git|detached HEAD|
+git|rejected|
+git|non-fast-forward|
+git|fatal:|
+dependencies|npm ERR|
+dependencies|ERESOLVE|
+dependencies|pip install|
+dependencies|No matching distribution|
+dependencies|yarn error|
+dependencies|cargo:|
+dependencies|Could not find a version|
+permissions|Permission denied|
+permissions|EACCES|
+permissions|Operation not permitted|
+permissions|read-only file system|
+network|ETIMEDOUT|
+network|Could not resolve host|
+network|Connection refused|
+network|Network is unreachable|
+network|timed out|
+syntax|SyntaxError|
+syntax|Unexpected token|
+syntax|error[E|
+syntax|ParseError|
+syntax|IndentationError|
+tests|FAILED|
+tests|AssertionError|
+tests|test(s) failed|
+tests|FAIL |
+tests|tests failed|
+filesystem|No such file or directory|
+filesystem|ENOENT|
+filesystem|cannot find|
+filesystem|does not exist|
+other||

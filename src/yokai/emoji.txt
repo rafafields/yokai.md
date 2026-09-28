@@ -1,0 +1,17 @@
+# Candidate emoji, one per line. One is picked at /yokai summon and kept
+# for the yokai's whole life.
+👺
+👹
+👻
+😈
+👿
+🧌
+🎃
+🎭
+💀
+👽
+🤡
+🧟
+🕷️
+🦇
+🦊

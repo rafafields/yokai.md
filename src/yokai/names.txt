@@ -1,0 +1,63 @@
+# Name catalog for /yokai summon. One entry per line: kind|value|meaning
+#   word    romanized Japanese word (combined as "X no Y" or "X-suffix")
+#   suffix  real yokai-archetype ending
+#   famous  real yokai name, used verbatim as an occasional easter egg
+# The meaning column is documentation only. Combination odds (15% famous,
+# 35% "X no Y", 50% "X-suffix") live in yokai-userprompt.sh.
+word|Yami|darkness
+word|Tsuki|moon
+word|Kage|shadow
+word|Hi|fire
+word|Mizu|water
+word|Kaze|wind
+word|Ame|rain
+word|Yuki|snow
+word|Tsuchi|earth
+word|Kuro|black
+word|Shiro|white
+word|Aka|red
+word|Yoru|night
+word|Nemuri|sleep
+word|Kiri|fog
+word|Kane|bell
+word|Ito|thread
+word|Hone|bone
+word|Namida|tear
+word|Warai|laughter
+word|Sake|rice wine
+word|Bug|terminal failure, obviously
+suffix|onna|spirit woman
+suffix|otoko|spirit man
+suffix|kozo|child monk
+suffix|bozu|monk
+suffix|baba|old woman
+suffix|jijii|old man
+suffix|warashi|child spirit
+suffix|nyudo|giant monk
+suffix|gami|minor deity
+suffix|oni|demon/ogre
+suffix|kitsune|fox spirit
+suffix|neko|cat spirit
+suffix|karasu|crow
+suffix|kumo|spider
+suffix|bi|ghost fire
+famous|Kappa|
+famous|Tengu|
+famous|Nurarihyon|
+famous|Rokurokubi|
+famous|Nue|
+famous|Jorogumo|
+famous|Yuki-onna|
+famous|Konaki-jijii|
+famous|Akaname|
+famous|Tsuchigumo|
+famous|Bakeneko|
+famous|Nekomata|
+famous|Kasa-obake|
+famous|Chochin-obake|
+famous|Hyakume|
+famous|Amanojaku|
+famous|Kamaitachi|
+famous|Shirime|
+famous|Zashiki-warashi|
+famous|Tofu-kozo|

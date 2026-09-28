@@ -1,0 +1,12 @@
+# Asides the installing agent drops in, one per step, in order.
+Installing hooks. This is the calmest this project will ever be.
+Writing config.json. Try not to get attached to the zero.
+Setting up the statusline. Yes, it's supposed to look like that.
+Registering commands. You'll forget them by next week.
+Building the error catalog. It already has opinions about you.
+Wiring up PostToolUse and PostToolUseFailure. Redundancy, because nothing here gets trusted once.
+Granting execute permissions. To the scripts, not to you.
+Loading the name catalog. It already knows what it'll be called before you do.
+Almost done. Enjoy these last few clean seconds.
+Installation complete. I haven't even been summoned and I'm already judging.
+Everything's in place. Whatever happens from here is on you.

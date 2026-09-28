@@ -2,20 +2,21 @@
 # statusLine: renders the yokai's fixed emoji + name plus its two
 # counters, or the temporary one-liner. Never reaches the model — this
 # is pure rendering in the terminal status bar.
-jq() { command jq -b "$@"; }
+# Directory of this script, whether invoked with / or \ separators.
+HOOK_DIR="${0%[/\\]*}"; [ "$HOOK_DIR" = "$0" ] && HOOK_DIR=.
+. "$HOOK_DIR/yokai-lib.sh"
 
-INPUT=$(cat)
-CWD=$(echo "$INPUT" | jq -r '.cwd' 2>/dev/null || pwd)
-YOKAI_DIR="$CWD/.claude/yokai"
-CONFIG="$YOKAI_DIR/config.json"
+yokai_read_input
+yokai_paths
 [ -f "$CONFIG" ] || exit 0
 
-STATE="$YOKAI_DIR/statusline_msg.json"
+STATE="$YOKAI_DIR/statusline_msg.txt"
 if [ -f "$STATE" ]; then
-  TS=$(jq -r '.ts' "$STATE")
-  NOW=$(date +%s)
-  if [ $(( NOW - TS )) -lt 15 ]; then
-    jq -r '.msg' "$STATE"
+  TS="" MSG=""
+  { IFS= read -r TS; IFS= read -r MSG; } < "$STATE" || true
+  yokai_now
+  if [[ $TS =~ ^[0-9]+$ ]] && [ $((NOW - TS)) -lt 15 ]; then
+    printf '%s\n' "$MSG"
     exit 0
   fi
   rm -f "$STATE"
@@ -24,24 +25,25 @@ fi
 # Numbers under 1000 show as-is; from 1000 up they're shown in K, with a
 # decimal only when it's not a whole number (1500 -> 1.5K, 2000 -> 2K).
 format_count() {
-  local n="$1"
+  local n="$1" r
   if [ "$n" -ge 1000 ]; then
-    jq -r -n --argjson n "$n" '($n/1000*10|round)/10 as $k | if ($k == ($k|floor)) then "\($k|floor)K" else "\($k)K" end'
+    r=$(((n + 50) / 100))
+    if [ $((r % 10)) -eq 0 ]; then
+      COUNT="$((r / 10))K"
+    else
+      COUNT="$((r / 10)).$((r % 10))K"
+    fi
   else
-    echo "$n"
+    COUNT="$n"
   fi
 }
 
-EMOJI=$(jq -r '.emoji' "$CONFIG")
-# '// empty' covers yokais summoned before names.json existed — no name
-# field, falls back to the plain emoji+counters line below.
-NAME=$(jq -r '.name // empty' "$CONFIG")
-LIFE=$(jq -r '.life' "$CONFIG")
-HUNGER_TODAY=$(jq -r '.hunger_today' "$CONFIG")
-LIFE_DISPLAY=$(format_count "$LIFE")
+config_load || exit 0
+format_count "$LIFE"
 
+# Yokais summoned before v7 have no name: plain emoji+counters line.
 if [ -n "$NAME" ]; then
-  echo "$EMOJI $NAME  Console fails: $HUNGER_TODAY · Yokai HP: $LIFE_DISPLAY"
+  echo "$EMOJI $NAME  Console fails: $HUNGER · Yokai HP: $COUNT"
 else
-  echo "$EMOJI  Console fails: $HUNGER_TODAY · Yokai HP: $LIFE_DISPLAY"
+  echo "$EMOJI  Console fails: $HUNGER · Yokai HP: $COUNT"
 fi

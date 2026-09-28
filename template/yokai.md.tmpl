@@ -13,21 +13,31 @@
 
 ## 0. Installation (read this first, agent)
 
+Requirements: `bash` (3.2 or newer — macOS's stock bash is fine; on
+Windows, the Git Bash that Claude Code already uses) and nothing else. No
+`jq`, Python or Node.
+
+If `.claude/hooks/yokai-sessionstart.sh` exists but `.claude/hooks/yokai-lib.sh`
+does **not**, this is a v7 install: delete `.claude/hooks/yokai-*.sh` and the
+`.claude/yokai/*.json` catalogs (everything in `.claude/yokai/` except
+`config.json`, which v8 reads as-is), then continue below.
+
 If `.claude/hooks/yokai-sessionstart.sh` does **not** exist yet:
 
 1. Create `.claude/commands/yokai.md` with the exact contents of section 8.1 (registers `/yokai summon|forget|report|help`).
-2. Create these four hooks with the exact contents of their sections, and make all four executable (`chmod +x`):
+2. Create these five hook files with the exact contents of their sections, and make the first four executable (`chmod +x`):
    - `.claude/hooks/yokai-sessionstart.sh` (section 8.2)
    - `.claude/hooks/yokai-userprompt.sh` (section 8.3)
    - `.claude/hooks/yokai-posttooluse.sh` (section 8.4)
    - `.claude/hooks/yokai-statusline.sh` (section 8.5)
-3. Create `.claude/yokai/errors.json` with the exact contents of section 8.6.
-4. Create `.claude/yokai/phrases.json` with the exact contents of section 8.7.
-5. Create `.claude/yokai/install_lines.json` with the exact contents of section 8.8.
-6. Create `.claude/yokai/emoji.json` with the exact contents of section 8.9.
-7. Create `.claude/yokai/names.json` with the exact contents of section 8.10.
-8. If `.claude/settings.json` doesn't exist, create it with the contents of section 8.11. If it already exists, merge the `hooks` and `statusLine` keys into it without overwriting anything already there — important: both `hooks.PostToolUse` and `hooks.PostToolUseFailure` need to end up registered, both pointing at the same script (section 4 explains why).
-9. As you complete steps 1-8, drop in the lines from `install_lines.json`, in order, one short aside right after each step — don't explain them, don't build up to them, just say them and move on to the next step.
+   - `.claude/hooks/yokai-lib.sh` (section 8.6 — shared helpers, sourced by the other four)
+3. Create `.claude/yokai/errors.txt` with the exact contents of section 8.7.
+4. Create `.claude/yokai/phrases.txt` with the exact contents of section 8.8.
+5. Create `.claude/yokai/install_lines.txt` with the exact contents of section 8.9.
+6. Create `.claude/yokai/emoji.txt` with the exact contents of section 8.10.
+7. Create `.claude/yokai/names.txt` with the exact contents of section 8.11.
+8. If `.claude/settings.json` doesn't exist, create it with the contents of section 8.12. If it already exists, merge the `hooks` and `statusLine` keys into it without overwriting anything already there — important: both `hooks.PostToolUse` and `hooks.PostToolUseFailure` need to end up registered, both pointing at the same script (section 4 explains why).
+9. As you complete steps 1-8, drop in the lines from `install_lines.txt` (lines starting with `#` are comments, skip them), in order, one short aside right after each step — don't explain them, don't build up to them, just say them and move on to the next step.
 10. Confirm to the user, in one sentence, that the yokai is ready to be born with `/yokai summon`, and remind them hooks only load at startup — if this install happened inside the current session, summon needs to happen in a new one. Don't do anything else — don't summon it yourself.
 
 If those files **already exist**, don't do any of the above — the whole mechanism lives in hooks and the statusline; you (the agent) only come into play when the user types `/yokai something`, and not even then do you have to make anything up (see section 7).
@@ -49,14 +59,15 @@ project/
       yokai-userprompt.sh           # summon | forget | report | help
       yokai-posttooluse.sh          # detects and categorizes Bash failures (PostToolUse + PostToolUseFailure)
       yokai-statusline.sh           # renders emoji + name + counters (or a temporary one-liner) in the status bar
+      yokai-lib.sh                  # shared helpers (input parsing, config read/write) — pure bash, no jq
     yokai/
-      errors.json                   # fixed catalog: categories + keywords
-      phrases.json                  # fixed catalog: 50 sarcastic one-liners
-      install_lines.json            # fixed catalog: sarcastic asides for the install itself
-      emoji.json                    # fixed catalog: 15 candidate emoji, one gets assigned at birth
-      names.json                    # fixed catalog: JP word bank + suffixes + famous yokai names, for the name assigned at birth
+      errors.txt                    # fixed catalog: categories + keywords
+      phrases.txt                   # fixed catalog: 50 sarcastic one-liners
+      install_lines.txt             # fixed catalog: sarcastic asides for the install itself
+      emoji.txt                     # fixed catalog: 15 candidate emoji, one gets assigned at birth
+      names.txt                     # fixed catalog: JP word bank + suffixes + famous yokai names, for the name assigned at birth
       config.json                   # born with /yokai summon — birth, life, hunger, streak, categories, emoji, name
-      statusline_msg.json           # temporary message (with expiry) after a one-liner fires — self-cleans
+      statusline_msg.txt            # temporary message (with expiry) after a one-liner fires — self-cleans
 ```
 
 ---
@@ -65,10 +76,9 @@ project/
 
 Command: `/yokai summon`. Initializes `config.json`: `life` to 0 (no ceiling,
 never resets afterward), `hunger_today` to 0, `quiet_streak` to 0, each
-category counter from `errors.json` to 0 (keys starting with `_` are
-ignored — catalog metadata, not categories), picks one random emoji from
-`emoji.json`'s 15 options as `emoji`, and generates a `name` from
-`names.json` (section 8.10) — 15% chance of a real famous yokai name
+category counter from `errors.txt` to 0, picks one random emoji from
+`emoji.txt`'s 15 options as `emoji`, and generates a `name` from
+`names.txt` (section 8.11) — 15% chance of a real famous yokai name
 verbatim, 35% chance of two word-bank entries joined as "X no Y", 50%
 chance of a word-bank entry plus a yokai-type suffix as "X-suffix". Both
 `emoji` and `name` are fixed for the yokai's whole life in this project —
@@ -103,10 +113,12 @@ failure; in others, failures go exclusively to `PostToolUseFailure` and
 `PostToolUse` only sees successes. The script tells them apart by
 `hook_event_name` and never counts the same failure twice.
 
-Categorization is a single `jq` call that compares, lowercased and as
-plain text (never as regex), the command + its output against the keywords
-of each category in `errors.json`. It's a v1 catalog — expect to need to
-tune it with real use.
+Categorization compares, case-insensitively and as plain text (never as
+regex), the command + its output against the keywords in `errors.txt`,
+top to bottom; the first match wins, and no match means `other`. It's a
+v1 catalog — expect to need to tune it with real use. A category added
+to `errors.txt` after a yokai was summoned is picked up the first time it
+matches.
 
 ## 5. On-screen display (statusline, zero cost)
 
@@ -122,7 +134,7 @@ model:
   resets every day) will rarely need K; "Yokai HP" (lifetime, uncapped) is
   the one that grows into it.
 - **Temporary one-liner**: every 10 total failures, a random line from
-  `phrases.json` replaces the emoji+name+counters in the statusline for
+  `phrases.txt` replaces the emoji+name+counters in the statusline for
   about 15 seconds, then it goes back to normal.
 
 ## 6. Commands
@@ -174,37 +186,43 @@ doesn't take part in the conversation at all.
 <!-- @include src/hooks/yokai-statusline.sh -->
 ```
 
-### 8.6 `.claude/yokai/errors.json`
+### 8.6 `.claude/hooks/yokai-lib.sh`
 
-```json
-<!-- @include src/yokai/errors.json -->
+```bash
+<!-- @include src/hooks/yokai-lib.sh -->
 ```
 
-### 8.7 `.claude/yokai/phrases.json`
+### 8.7 `.claude/yokai/errors.txt`
 
-```json
-<!-- @include src/yokai/phrases.json -->
+```text
+<!-- @include src/yokai/errors.txt -->
 ```
 
-### 8.8 `.claude/yokai/install_lines.json`
+### 8.8 `.claude/yokai/phrases.txt`
 
-```json
-<!-- @include src/yokai/install_lines.json -->
+```text
+<!-- @include src/yokai/phrases.txt -->
 ```
 
-### 8.9 `.claude/yokai/emoji.json`
+### 8.9 `.claude/yokai/install_lines.txt`
 
-```json
-<!-- @include src/yokai/emoji.json -->
+```text
+<!-- @include src/yokai/install_lines.txt -->
 ```
 
-### 8.10 `.claude/yokai/names.json`
+### 8.10 `.claude/yokai/emoji.txt`
 
-```json
-<!-- @include src/yokai/names.json -->
+```text
+<!-- @include src/yokai/emoji.txt -->
 ```
 
-### 8.11 `.claude/settings.json` (keys to merge)
+### 8.11 `.claude/yokai/names.txt`
+
+```text
+<!-- @include src/yokai/names.txt -->
+```
+
+### 8.12 `.claude/settings.json` (keys to merge)
 
 ```json
 <!-- @include src/settings.json -->
@@ -212,15 +230,26 @@ doesn't take part in the conversation at all.
 
 ---
 
-*Still open: keep tuning `errors.json` against real cases. Compatibility
-note: the scripts use `date -d`, GNU/Linux syntax — on macOS they need
-`date -j -f` instead.*
+*Still open: keep tuning `errors.txt` against real cases.*
 
 ---
 
 ## Version history
 
-- **v7** (current): added a `name` for each yokai, generated once at
+- **v8** (current): no more `jq` — the hooks are pure bash (3.2+, so
+  macOS's stock bash works) and the only requirement is the bash Claude
+  Code already uses. Shared helpers moved to a new `yokai-lib.sh`. The
+  catalogs are plain text now (`errors.txt`, `phrases.txt`,
+  `install_lines.txt`, `emoji.txt`, `names.txt`), and `names.txt` lost
+  the leftover `es` key. `config.json` keeps the exact v7 layout, so
+  existing yokais carry over. The project root comes from
+  `$CLAUDE_PROJECT_DIR` instead of the hook's `cwd`, so failures still
+  count after the agent `cd`s into a subdirectory. A category added to the
+  catalog after summon no longer crashes the failure hook. Hook messages
+  go out as plain stdout, which Claude Code adds to context the same way
+  as `additionalContext`. A typical failure takes ~170 ms to process on
+  Windows (v7: ~2.6 s).
+- **v7**: added a `name` for each yokai, generated once at
   `/yokai summon` from `names.json` (section 8.10) and fixed for its
   whole life next to the emoji — 15% chance of a real yokai name
   verbatim, 35% chance of "X no Y" from a Japanese word bank, 50% chance
