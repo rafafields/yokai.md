@@ -124,8 +124,11 @@ update `config.json` take a lock first, so failures from parallel Bash
 calls don't overwrite each other's counts.
 
 Categorization compares, case-insensitively and as plain text (never as
-regex), the command + its output against the keywords in `errors.txt`,
-top to bottom; the first match wins, and no match means `other`. It's a
+regex), the keywords in `errors.txt` against the command's output first
+and the command itself second — what went wrong beats what was run, so a
+`git commit` whose pre-commit hook failed the tests counts as `tests`.
+Within each pass the catalog is read top to bottom; the first match
+wins, and no match means `other`. It's a
 v1 catalog — expect to need to tune it with real use. A category added
 to `errors.txt` after a yokai was summoned is picked up the first time it
 matches.
@@ -387,17 +390,18 @@ json_str tool_name || exit 0
 yokai_paths
 [ -f "$CONFIG" ] || exit 0
 
-# The text keywords are searched in: the command plus the raw JSON after
-# the error/response key (undecoded — plain substring matching doesn't
-# need it decoded, and decoding big output would cost seconds).
+# Keywords are searched in the output (the raw JSON after the error or
+# response key — undecoded, since plain substring matching doesn't need
+# it decoded and decoding big output would cost seconds), then in the
+# command.
 json_str command || true
-TEXT="$JSON_STR"
+COMMAND="$JSON_STR"
 json_str hook_event_name || true
 if [ "$JSON_STR" = "PostToolUseFailure" ]; then
   # The failure is guaranteed (the event itself says so), and the error
   # text lives in .error, not .tool_response.
   json_raw error || true
-  TEXT="$TEXT $JSON_RAW"
+  OUTPUT="$JSON_RAW"
 else
   # Counts only if the response says it failed. Matching the key is safe
   # against stdout content: inside a JSON string, quotes are escaped.
@@ -408,7 +412,7 @@ else
     *) exit 0 ;;
   esac
   json_raw tool_response || true
-  TEXT="$TEXT $JSON_RAW"
+  OUTPUT="$JSON_RAW"
 fi
 
 yokai_lock || exit 0
@@ -425,16 +429,19 @@ yokai_rollover || rc=$?
 load_errors
 
 # First catalog line whose keyword appears in the text wins. Plain
-# substring match (never regex), case-insensitive.
+# substring match (never regex), case-insensitive. The output goes first:
+# what went wrong says more than what was run.
 CATEGORY="other"
 shopt -s nocasematch
-for ((i = 0; i < ${#ERR_KW[@]}; i++)); do
-  kw="${ERR_KW[i]}"
-  [ -n "$kw" ] || continue
-  if [[ $TEXT == *"$kw"* ]]; then
-    CATEGORY="${ERR_CAT[i]}"
-    break
-  fi
+for text in "$OUTPUT" "$COMMAND"; do
+  for ((i = 0; i < ${#ERR_KW[@]}; i++)); do
+    kw="${ERR_KW[i]}"
+    [ -n "$kw" ] || continue
+    if [[ $text == *"$kw"* ]]; then
+      CATEGORY="${ERR_CAT[i]}"
+      break 2
+    fi
+  done
 done
 shopt -u nocasematch
 
@@ -854,45 +861,67 @@ config_save() {
 ```text
 # Error category catalog. One keyword per line: category|keyword|
 #
-# Keywords are case-insensitive plain substrings (never regex), searched
-# in the failed command + its output. The pipes delimit the keyword so
+# Keywords are case-insensitive plain substrings (never regex). The
+# failed command's output is searched first, then the command itself, so
+# what went wrong beats what was run: a `git commit` whose pre-commit hook
+# failed the tests is "tests". Within each pass, lines are tried top to
+# bottom and the first match wins, so keep each category's lines together
+# and specific categories first. The pipes delimit the keyword so
 # leading/trailing spaces stay visible ("git |" ends in a space), which
-# means a keyword can't contain "|". Lines are tried top to bottom and the
-# first match wins, so keep each category's lines together. A line with
-# an empty keyword just declares a category (like "other", the fallback).
-# v1, keyword-based — expect to tune it with real usage.
-git|git |
-git|merge conflict|
-git|detached HEAD|
-git|rejected|
-git|non-fast-forward|
-git|fatal:|
+# means a keyword can't contain "|". A line with an empty keyword just
+# declares a category (like "other", the fallback).
+#
+# Only failed commands get here, so a test runner's summary line is enough
+# to call it "tests". Avoid bare words like "failed": matching ignores
+# case, so they'd catch every "Build failed".
+tests|AssertionError|
+tests|assertion failed|
+tests|tests failed|
+tests|test(s) failed|
+tests|test failed|
+tests|Test Suites:|
+tests|short test summary info|
+tests|--- FAIL:|
+tests|test result: FAILED|
 dependencies|npm ERR|
+dependencies|npm error|
 dependencies|ERESOLVE|
+dependencies|Cannot find module|
+dependencies|Module not found|
+dependencies|ModuleNotFoundError|
+dependencies|No module named|
 dependencies|pip install|
 dependencies|No matching distribution|
 dependencies|yarn error|
 dependencies|cargo:|
 dependencies|Could not find a version|
+syntax|SyntaxError|
+syntax|syntax error|
+syntax|Unexpected token|
+syntax|unexpected EOF|
+syntax|error[E|
+syntax|ParseError|
+syntax|IndentationError|
 permissions|Permission denied|
 permissions|EACCES|
+permissions|EPERM|
 permissions|Operation not permitted|
+permissions|Access is denied|
 permissions|read-only file system|
 network|ETIMEDOUT|
+network|ECONNREFUSED|
 network|Could not resolve host|
 network|Connection refused|
 network|Network is unreachable|
 network|timed out|
-syntax|SyntaxError|
-syntax|Unexpected token|
-syntax|error[E|
-syntax|ParseError|
-syntax|IndentationError|
-tests|FAILED|
-tests|AssertionError|
-tests|test(s) failed|
-tests|FAIL |
-tests|tests failed|
+git|merge conflict|
+git|not a git repository|
+git|pathspec|
+git|detached HEAD|
+git|[rejected]|
+git|Updates were rejected|
+git|non-fast-forward|
+git|git |
 filesystem|No such file or directory|
 filesystem|ENOENT|
 filesystem|cannot find|

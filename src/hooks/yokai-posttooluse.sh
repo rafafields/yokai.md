@@ -16,17 +16,18 @@ json_str tool_name || exit 0
 yokai_paths
 [ -f "$CONFIG" ] || exit 0
 
-# The text keywords are searched in: the command plus the raw JSON after
-# the error/response key (undecoded — plain substring matching doesn't
-# need it decoded, and decoding big output would cost seconds).
+# Keywords are searched in the output (the raw JSON after the error or
+# response key — undecoded, since plain substring matching doesn't need
+# it decoded and decoding big output would cost seconds), then in the
+# command.
 json_str command || true
-TEXT="$JSON_STR"
+COMMAND="$JSON_STR"
 json_str hook_event_name || true
 if [ "$JSON_STR" = "PostToolUseFailure" ]; then
   # The failure is guaranteed (the event itself says so), and the error
   # text lives in .error, not .tool_response.
   json_raw error || true
-  TEXT="$TEXT $JSON_RAW"
+  OUTPUT="$JSON_RAW"
 else
   # Counts only if the response says it failed. Matching the key is safe
   # against stdout content: inside a JSON string, quotes are escaped.
@@ -37,7 +38,7 @@ else
     *) exit 0 ;;
   esac
   json_raw tool_response || true
-  TEXT="$TEXT $JSON_RAW"
+  OUTPUT="$JSON_RAW"
 fi
 
 yokai_lock || exit 0
@@ -54,16 +55,19 @@ yokai_rollover || rc=$?
 load_errors
 
 # First catalog line whose keyword appears in the text wins. Plain
-# substring match (never regex), case-insensitive.
+# substring match (never regex), case-insensitive. The output goes first:
+# what went wrong says more than what was run.
 CATEGORY="other"
 shopt -s nocasematch
-for ((i = 0; i < ${#ERR_KW[@]}; i++)); do
-  kw="${ERR_KW[i]}"
-  [ -n "$kw" ] || continue
-  if [[ $TEXT == *"$kw"* ]]; then
-    CATEGORY="${ERR_CAT[i]}"
-    break
-  fi
+for text in "$OUTPUT" "$COMMAND"; do
+  for ((i = 0; i < ${#ERR_KW[@]}; i++)); do
+    kw="${ERR_KW[i]}"
+    [ -n "$kw" ] || continue
+    if [[ $text == *"$kw"* ]]; then
+      CATEGORY="${ERR_CAT[i]}"
+      break 2
+    fi
+  done
 done
 shopt -u nocasematch
 

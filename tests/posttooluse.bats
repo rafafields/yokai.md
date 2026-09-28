@@ -91,17 +91,31 @@ categorize() {
       return 1
     fi
   done <<'EOF'
-git push|remote: rejected|git
-make|fatal: not a git repository|git
+git push| ! [rejected]        main -> main (non-fast-forward)|git
+make|fatal: not a git repository (or any of the parent directories): .git|git
+git pull|CONFLICT (content): Merge conflict in a.txt|git
+git status|some odd message|git
 npm install|npm ERR! code ERESOLVE|dependencies
+npm install|npm error code E404|dependencies
+node app.js|Error: Cannot find module 'express'|dependencies
+python app.py|ModuleNotFoundError: No module named 'flask'|dependencies
 pip3 install foo|ERROR: No matching distribution found for foo|dependencies
 ./run.sh|bash: ./run.sh: Permission denied|permissions
+del x|Access is denied.|permissions
 curl https://x.test|curl: (6) Could not resolve host: x.test|network
+git fetch|fatal: unable to access 'https://x/': Could not resolve host: x|network
 node app.js|SyntaxError: Unexpected token '}'|syntax
+bash x.sh|x.sh: line 3: syntax error near unexpected token `fi'|syntax
 rustc main.rs|error[E0308]: mismatched types|syntax
 pytest|E   AssertionError: 1 != 2|tests
-npx jest|FAIL src/a.test.js|tests
+pytest|=== short test summary info ===\nFAILED t.py::test_a|tests
+npx jest|FAIL src/a.test.js\nTest Suites: 1 failed, 1 total|tests
+go test ./...|--- FAIL: TestX (0.00s)|tests
+cargo test|test result: FAILED. 1 passed; 1 failed|tests
+git commit -m wip|pre-commit: 2 tests failed|tests
+gcc a.c|a.c:1:10: fatal error: x.h: No such file or directory|filesystem
 cat missing.txt|cat: missing.txt: No such file or directory|filesystem
+npm run build|Build failed with 1 error|other
 make|something went sideways|other
 EOF
 }

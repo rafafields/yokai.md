@@ -124,8 +124,11 @@ update `config.json` take a lock first, so failures from parallel Bash
 calls don't overwrite each other's counts.
 
 Categorization compares, case-insensitively and as plain text (never as
-regex), the command + its output against the keywords in `errors.txt`,
-top to bottom; the first match wins, and no match means `other`. It's a
+regex), the keywords in `errors.txt` against the command's output first
+and the command itself second — what went wrong beats what was run, so a
+`git commit` whose pre-commit hook failed the tests counts as `tests`.
+Within each pass the catalog is read top to bottom; the first match
+wins, and no match means `other`. It's a
 v1 catalog — expect to need to tune it with real use. A category added
 to `errors.txt` after a yokai was summoned is picked up the first time it
 matches.
