@@ -17,12 +17,17 @@ Requirements: `bash` (3.2 or newer — macOS's stock bash is fine; on
 Windows, the Git Bash that Claude Code already uses) and nothing else. No
 `jq`, Python or Node.
 
-If `.claude/hooks/yokai-sessionstart.sh` exists but `.claude/hooks/yokai-lib.sh`
-does **not**, this is a v7 install: delete `.claude/hooks/yokai-*.sh` and the
-`.claude/yokai/*.json` catalogs (everything in `.claude/yokai/` except
-`config.json`, which v8 reads as-is), then continue below.
+This file is protocol **v9**. If `.claude/hooks/yokai-sessionstart.sh`
+already exists, find the installed version: the `YOKAI_VERSION=` line in
+`.claude/hooks/yokai-lib.sh` (no such line, or no such file, means v8 or
+older). If it's lower than 9, upgrade: delete `.claude/hooks/yokai-*.sh`
+and everything in `.claude/yokai/` except `config.json` and
+`statusline_next` (the yokai itself, which v9 reads as-is, and the status
+line it chains), remove the hook entries whose command mentions `yokai-`
+from `.claude/settings.json`, then install as below.
 
-If `.claude/hooks/yokai-sessionstart.sh` does **not** exist yet:
+If `.claude/hooks/yokai-sessionstart.sh` does **not** exist (or you just
+cleared an old version):
 
 1. Create `.claude/commands/yokai.md` with the exact contents of section 8.1 (registers `/yokai summon|forget|report|help`).
 2. Create these five hook files with the exact contents of their sections, and make the first four executable (`chmod +x`):
@@ -36,7 +41,7 @@ If `.claude/hooks/yokai-sessionstart.sh` does **not** exist yet:
 5. Create `.claude/yokai/install_lines.txt` with the exact contents of section 8.9.
 6. Create `.claude/yokai/emoji.txt` with the exact contents of section 8.10.
 7. Create `.claude/yokai/names.txt` with the exact contents of section 8.11.
-8. If `.claude/settings.json` doesn't exist, create it with the contents of section 8.12. If it already exists, merge the `hooks` and `statusLine` keys into it without overwriting anything already there — important: both `hooks.PostToolUse` and `hooks.PostToolUseFailure` need to end up registered, both pointing at the same script (section 4 explains why).
+8. If `.claude/settings.json` doesn't exist, create it with the contents of section 8.12. If it already exists, merge the `hooks` key into it without overwriting anything already there — important: both `hooks.PostToolUse` and `hooks.PostToolUseFailure` need to end up registered, both pointing at the same script (section 4 explains why). Then the status line, which holds a single command: look for an existing `statusLine` in `.claude/settings.local.json`, then `.claude/settings.json`, then `~/.claude/settings.json`, and take the first one found whose command isn't the yokai's. If there is one, write its `command` string verbatim as the only line of `.claude/yokai/statusline_next` — the yokai's status line runs it after its own line, so theirs stays visible right below — and, if it came from `settings.local.json` (which would override the project's), remove it from there. Finally set `statusLine` in `.claude/settings.json` to the one in section 8.12.
 9. As you complete steps 1-8, drop in the lines from `install_lines.txt` (lines starting with `#` are comments, skip them), in order, one short aside right after each step — don't explain them, don't build up to them, just say them and move on to the next step.
 10. Confirm to the user, in one sentence, that the yokai is ready to be born with `/yokai summon`, and remind them hooks only load at startup — if this install happened inside the current session, summon needs to happen in a new one. Don't do anything else — don't summon it yourself.
 
@@ -50,7 +55,7 @@ If those files **already exist**, don't do any of the above — the whole mechan
 
 ```
 project/
-  yokai.md                         # this file — protocol + installer
+  yokai.md                         # this file — protocol + installer (wherever you dropped it; not needed after install)
   .claude/
     commands/
       yokai.md                     # registers /yokai (summon | forget | report | help)
@@ -71,6 +76,7 @@ project/
       farewell.txt                  # queued goodbye when the yokai leaves mid-session — delivered once, then deleted
       seen_ids                      # last 50 counted tool_use_ids — so no failure counts twice
       .lock/                        # held while a hook updates config.json — gone when it exits
+      statusline_next               # the status line the project had before the install — runs below the yokai's
 ```
 
 ---
@@ -146,6 +152,9 @@ model:
   (`1500` → `1.5K`, `2000` → `2K`). In practice "Console fails" (daily,
   resets every day) will rarely need K; "Yokai HP" (lifetime, uncapped) is
   the one that grows into it.
+- **Your own status line, if you had one**: the installer saves it to
+  `.claude/yokai/statusline_next` and the yokai runs it right below its
+  own line, with the same input — nothing gets replaced.
 - **Temporary one-liner**: every 10 total failures, a random line from
   `phrases.txt` replaces the emoji+name+counters in the statusline for
   about 15 seconds, then it goes back to normal.
@@ -477,27 +486,12 @@ exit 0
 #!/usr/bin/env bash
 # statusLine: renders the yokai's fixed emoji + name plus its two
 # counters, or the temporary one-liner. Never reaches the model — this
-# is pure rendering in the terminal status bar.
+# is pure rendering in the terminal status bar. If the project had a
+# status line before the yokai, it runs below the yokai's line.
 # Directory of this script, whether invoked with / or \ separators.
 HOOK_DIR="${0%[/\\]*}"; [ "$HOOK_DIR" = "$0" ] && HOOK_DIR=.
 # shellcheck source=yokai-lib.sh
 . "$HOOK_DIR/yokai-lib.sh"
-
-yokai_read_input
-yokai_paths
-[ -f "$CONFIG" ] || exit 0
-
-STATE="$YOKAI_DIR/statusline_msg.txt"
-if [ -f "$STATE" ]; then
-  TS="" MSG=""
-  { IFS= read -r TS; IFS= read -r MSG; } < "$STATE" || true
-  yokai_now
-  if [[ $TS =~ ^[0-9]+$ ]] && [ $((NOW - TS)) -lt 15 ]; then
-    printf '%s\n' "$MSG"
-    exit 0
-  fi
-  rm -f "$STATE"
-fi
 
 # Numbers under 1000 show as-is; from 1000 up they're shown in K, with a
 # decimal only when it's not a whole number (1500 -> 1.5K, 2000 -> 2K).
@@ -515,20 +509,55 @@ format_count() {
   fi
 }
 
-config_load || exit 0
-# The statusline never writes the config (it runs every few seconds);
-# a count from a previous day just displays as today's 0 until a hook
-# rolls it over.
-yokai_now
-[ "$DATE" = "$TODAY" ] || HUNGER=0
-format_count "$LIFE"
+# Sets LINE to the yokai's line, or leaves it empty when there's no yokai.
+yokai_line() {
+  LINE=""
+  [ -f "$CONFIG" ] || return 0
 
-# Yokais summoned before v7 have no name: plain emoji+counters line.
-if [ -n "$NAME" ]; then
-  echo "$EMOJI $NAME  Console fails: $HUNGER · Yokai HP: $COUNT"
-else
-  echo "$EMOJI  Console fails: $HUNGER · Yokai HP: $COUNT"
+  local state="$YOKAI_DIR/statusline_msg.txt" ts="" msg=""
+  if [ -f "$state" ]; then
+    { IFS= read -r ts; IFS= read -r msg; } < "$state" || true
+    if [[ $ts =~ ^[0-9]+$ ]] && [ $((NOW - ts)) -lt 15 ]; then
+      LINE="$msg"
+      return 0
+    fi
+    rm -f "$state"
+  fi
+
+  config_load || return 0
+  # The statusline never writes the config (it runs every few seconds);
+  # a count from a previous day just displays as today's 0 until a hook
+  # rolls it over.
+  [ "$DATE" = "$TODAY" ] || HUNGER=0
+  local hunger life
+  format_count "$HUNGER"; hunger="$COUNT"
+  format_count "$LIFE"; life="$COUNT"
+
+  # Yokais summoned before v7 have no name: plain emoji+counters line.
+  if [ -n "$NAME" ]; then
+    LINE="$EMOJI $NAME  Console fails: $hunger · Yokai HP: $life"
+  else
+    LINE="$EMOJI  Console fails: $hunger · Yokai HP: $life"
+  fi
+}
+
+yokai_read_input
+yokai_paths
+yokai_now
+yokai_line
+[ -z "$LINE" ] || printf '%s\n' "$LINE"
+
+# The status line command the project had before the install, saved by
+# the installer (section 0). It gets the same JSON on stdin.
+NEXT_FILE="$YOKAI_DIR/statusline_next"
+if [ -f "$NEXT_FILE" ]; then
+  NEXT=""
+  IFS= read -r NEXT < "$NEXT_FILE" || true
+  if [ -n "$NEXT" ]; then
+    printf '%s' "$YOKAI_INPUT" | bash -c "$NEXT"
+  fi
 fi
+exit 0
 ```
 
 ### 8.6 `.claude/hooks/yokai-lib.sh`
@@ -541,6 +570,10 @@ fi
 #
 # Shared helpers for the yokai hooks. Sourced, never executed. Pure bash
 # (3.2-compatible, so macOS's stock bash works) — no jq, python or node.
+
+# Protocol version of this install. The installer reads it to decide
+# whether to upgrade (yokai.md section 0).
+YOKAI_VERSION=9
 
 # yokai_say LABEL TEXT: prints a message for the model to relay to the
 # user word for word. Every message the yokai sends goes through here, so
@@ -1100,19 +1133,19 @@ famous|Tofu-kozo|
   "hooks": {
     "SessionStart": [
       { "matcher": "startup|resume|compact",
-        "hooks": [{ "type": "command", "command": ".claude/hooks/yokai-sessionstart.sh", "timeout": 10 }] }
+        "hooks": [{ "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/yokai-sessionstart.sh", "timeout": 10 }] }
     ],
     "UserPromptSubmit": [
       { "matcher": "",
-        "hooks": [{ "type": "command", "command": ".claude/hooks/yokai-userprompt.sh", "timeout": 10 }] }
+        "hooks": [{ "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/yokai-userprompt.sh", "timeout": 10 }] }
     ],
     "PostToolUse": [
       { "matcher": "Bash",
-        "hooks": [{ "type": "command", "command": ".claude/hooks/yokai-posttooluse.sh", "timeout": 10 }] }
+        "hooks": [{ "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/yokai-posttooluse.sh", "timeout": 10 }] }
     ],
     "PostToolUseFailure": [
       { "matcher": "Bash",
-        "hooks": [{ "type": "command", "command": ".claude/hooks/yokai-posttooluse.sh", "timeout": 10 }] }
+        "hooks": [{ "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/yokai-posttooluse.sh", "timeout": 10 }] }
     ]
   },
   "statusLine": {
@@ -1131,7 +1164,28 @@ famous|Tofu-kozo|
 
 ## Version history
 
-- **v8** (current): no more `jq` — the hooks are pure bash (3.2+, so
+- **v9** (current): bug-fix release.
+  - **Messages**: every message the yokai sends is tagged for the agent to
+    relay verbatim (summon and forget weren't). `/yokai report` and
+    `/yokai forget` without a yokai say so instead of leaving the agent to
+    improvise, and a report with zero failures no longer crowns a
+    category at 0.
+  - **Days**: the day rolls over in every hook, not just at session start,
+    so a session open across midnight rolls over too. Days with no session
+    count as quiet, as section 3 always said. A departure noticed
+    mid-session is announced with the next prompt.
+  - **Counting**: config updates take a lock, so parallel failures no
+    longer overwrite each other. Each `tool_use_id` counts once, even when
+    it arrives through both events.
+  - **Categories**: the output is matched before the command, most-specific
+    categories come first, and tests match test-runner signatures instead
+    of any "failed".
+  - **Install**: an existing status line is kept and chained below the
+    yokai's instead of left in conflict. Hooks are registered through
+    `${CLAUDE_PROJECT_DIR}`. `YOKAI_VERSION` in `yokai-lib.sh` lets the
+    installer upgrade any older install.
+  - **Display**: "Console fails" uses K notation too.
+- **v8**: no more `jq` — the hooks are pure bash (3.2+, so
   macOS's stock bash works) and the only requirement is the bash Claude
   Code already uses. Shared helpers moved to a new `yokai-lib.sh`. The
   catalogs are plain text now (`errors.txt`, `phrases.txt`,

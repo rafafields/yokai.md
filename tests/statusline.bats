@@ -71,3 +71,24 @@ EOF
   run "$YOKAI_BASH" "$(cygpath -w "$HOOKS")\\yokai-statusline.sh" < <(fixture statusline "CWD=$PROJECT")
   [ "$output" = "👻 Kage no Ame  Console fails: 1 · Yokai HP: 1" ]
 }
+
+@test "a status line from before the install runs below the yokai's (Y-02)" {
+  v7_config 1 1 "$TODAY" 0
+  printf '%s\n' 'read -r j; echo "theirs: ${#j} bytes"' > "$YOKAI/statusline_next"
+  run statusline
+  [ "${lines[0]}" = "👻 Kage no Ame  Console fails: 1 · Yokai HP: 1" ]
+  [[ ${lines[1]} == "theirs: "*" bytes" ]]
+  [ "${lines[1]}" != "theirs: 0 bytes" ]
+}
+
+@test "the chained status line still runs without a yokai" {
+  printf '%s\n' 'echo theirs' > "$YOKAI/statusline_next"
+  run statusline
+  [ "$output" = theirs ]
+}
+
+@test "Console fails uses K notation too" {
+  v7_config 5000 1500 "$TODAY" 0
+  run statusline
+  [ "$output" = "👻 Kage no Ame  Console fails: 1.5K · Yokai HP: 5K" ]
+}

@@ -6,6 +6,10 @@
 # Shared helpers for the yokai hooks. Sourced, never executed. Pure bash
 # (3.2-compatible, so macOS's stock bash works) — no jq, python or node.
 
+# Protocol version of this install. The installer reads it to decide
+# whether to upgrade (yokai.md section 0).
+YOKAI_VERSION=9
+
 # yokai_say LABEL TEXT: prints a message for the model to relay to the
 # user word for word. Every message the yokai sends goes through here, so
 # none of them gets paraphrased.

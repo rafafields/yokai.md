@@ -36,3 +36,26 @@ load test_helper
   "$REPO_ROOT/scripts/build.sh" "$BATS_TEST_TMPDIR/yokai.md"
   diff "$REPO_ROOT/dist/yokai.md" "$BATS_TEST_TMPDIR/yokai.md"
 }
+
+@test "the hook commands in settings.json run from any directory" {
+  cp "$REPO_ROOT/src/settings.json" "$BATS_TEST_TMPDIR/settings.json"
+  roots=("$PROJECT") ran=0
+  if command -v cygpath >/dev/null; then roots+=("$(cygpath -w "$PROJECT")"); fi
+  while IFS= read -r cmd; do
+    cmd="${cmd//\\\"/\"}"
+    for root in "${roots[@]}"; do
+      run env CLAUDE_PROJECT_DIR="$root" bash -c "cd / && $cmd" < <(fixture sessionstart)
+      [ "$status" -eq 0 ] || { echo "failed: $cmd (root $root): $output"; return 1; }
+      ran=$((ran + 1))
+    done
+  done < <(grep -o '"command": "[^,]*/yokai-[a-z]*\.sh"' "$BATS_TEST_TMPDIR/settings.json" | grep CLAUDE_PROJECT_DIR | sed 's/^"command": "//; s/"$//')
+  [ "$ran" -eq $((4 * ${#roots[@]})) ]
+}
+
+@test "YOKAI_VERSION matches the protocol version the installer announces" {
+  lib=$(grep -o '^YOKAI_VERSION=[0-9]*' "$REPO_ROOT/src/hooks/yokai-lib.sh")
+  proto=$(grep -o 'This file is protocol \*\*v[0-9]*\*\*' "$REPO_ROOT/template/yokai.md.tmpl")
+  [ -n "$lib" ] && [ -n "$proto" ]
+  [ "${lib#YOKAI_VERSION=}" = "$(echo "$proto" | tr -dc '0-9')" ]
+  grep -q "^- \*\*v${lib#YOKAI_VERSION=}\*\* (current)" "$REPO_ROOT/template/yokai.md.tmpl"
+}

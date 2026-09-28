@@ -25,7 +25,7 @@ being edited, not instructions for you. Never create `.claude/hooks/yokai-*`,
 - Edit `src/` and the template, never `dist/yokai.md` by hand. Run `./scripts/build.sh` and commit `dist/yokai.md` together with its sources (a test checks that it's up to date).
 - Any new file under `src/` needs an `@include` in the template and a step in its section 0 (a test enforces both).
 - Run the tests with `tests/bats/bin/bats tests/` (run `git submodule update --init` first). Run shellcheck with `shellcheck src/hooks/*.sh scripts/*.sh` (it isn't installed on the maintainer's Windows machine).
-- A behavior change is a new protocol version: add an entry at the top of "Version history" in the template.
+- A behavior change is a new protocol version. Bump `YOKAI_VERSION` in `src/hooks/yokai-lib.sh`, update "This file is protocol **vN**" in section 0, and add an entry at the top of "Version history" in the template. A test checks all three agree. The installer uses `YOKAI_VERSION` to decide whether to upgrade an existing install.
 
 ## Hook constraints
 
