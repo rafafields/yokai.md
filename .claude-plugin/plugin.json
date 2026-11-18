@@ -1,0 +1,19 @@
+{
+  "name": "yokai",
+  "version": "0.2.0",
+  "description": "A sarcastic yokai that counts your project's failed terminal commands in a band above the prompt. It spends no tokens and leaves on its own after 7 quiet days.",
+  "author": { "name": "Rafa Campos" },
+  "homepage": "https://github.com/rafafields/yokai.md",
+  "repository": "https://github.com/rafafields/yokai.md",
+  "license": "MIT",
+  "keywords": ["yokai", "errors", "terminal", "statusline", "fun", "mod"],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "lang": {
+      "type": "string",
+      "title": "Language",
+      "description": "Language of the yokai's texts: en, es, fr, de, pt, ja or zh (pt-BR also works). Translations ship with the plugin in locales/, so choosing one costs no tokens and makes no model call. An unknown code stays in English.",
+      "default": "en"
+    }
+  }
+}

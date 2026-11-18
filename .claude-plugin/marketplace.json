@@ -1,0 +1,18 @@
+{
+  "name": "yokai",
+  "owner": { "name": "Rafa Campos" },
+  "metadata": {
+    "description": "A sarcastic yokai that counts your failed terminal commands in Claude Code."
+  },
+  "plugins": [
+    {
+      "name": "yokai",
+      "source": "./",
+      "description": "A sarcastic yokai that counts your project's failed terminal commands in a band above the prompt.",
+      "version": "0.2.0",
+      "author": { "name": "Rafa Campos" },
+      "license": "MIT",
+      "keywords": ["yokai", "errors", "terminal", "fun", "mod"]
+    }
+  ]
+}

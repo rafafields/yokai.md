@@ -1,1 +1,10 @@
-docs/
+# Written by Claude Code while the plugin loads; never part of the plugin.
+.claude-plugin/types/
+
+# Local state of the yokai, if the plugin is run inside this repo.
+.claude/yokai/
+
+.DS_Store
+*.log
+*~
+*.swp
