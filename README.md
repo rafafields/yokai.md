@@ -1,4 +1,4 @@
-<p align="center"><img src=".claude-plugin/icon.png" alt="yokai" width="128"></p>
+<p align="center"><img src="assets/banner.jpg" alt="yokai.md, fed by console fails: an oni eating a bowl of noodles made of terminal errors" width="720"></p>
 
 # yokai
 
